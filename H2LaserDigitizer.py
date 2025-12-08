@@ -49,20 +49,23 @@ class H2LaserDigitizer(threading.Thread):
             today_root_number = len(glob.glob("{}/root/{}_{}*.root".format(self.data_path, self.output_name, date)))
             root_name = "{}/root/{}_{}_{:04d}.root".format(self.data_path, self.output_name, date, today_root_number)
 
-            self.root_pointer = picoDAQAssistant.RootManager(filename=root_name, runN=0, chunk_size=1000, sample_num=self.sample_number)
+            self.root_pointer = picoDAQAssistant.RootManager(filename=root_name, runN=0, chunk_size=1000, sample_num=self.sample_number, add_channels=self.channels)
             self.root_pointer.start_thread()
 
             # Create csv file
             csv_fullpath = f"{self.data_path}/csv/{date}.csv"
-            if not os.path.exists(csv_fullpath):
-                if self.csv_pointer is not None:
-                    self.csv_pointer.close()
-                self.csv_pointer = open(csv_fullpath, "a", newline="")
-                self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+self.channels)
+            file_exists = os.path.exists(csv_fullpath)
+
+            if self.csv_pointer is not None:    # Create new file
+                self.csv_pointer.close()
+            self.csv_pointer = open(csv_fullpath, "a", newline="")
+            self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+self.channels)
+            if not file_exists: # Create new file
                 self.csv_writer.writeheader()
 
             trigger_cnt = 0
 
+            time_start = time.time()
             while (trigger_cnt < self.trigger_per_file and not self.stop_event.is_set()):
                 if self.model == "3405D":
                     self.pico3000BlockCapture()
@@ -77,7 +80,7 @@ class H2LaserDigitizer(threading.Thread):
                     csv_row = {}
                     csv_row['timestamp'] = time.time()
                     for ch_idx in self.channels:
-                        csv_row[ch_idx] = np.sum(wave[ch_idx]) * self.delta_t
+                        csv_row[ch_idx] = np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t
                     self.csv_writer.writerow(csv_row)
                     self.csv_pointer.flush()
                     # Send latest value to monitor
@@ -88,6 +91,12 @@ class H2LaserDigitizer(threading.Thread):
                     # })
 
                 trigger_cnt += 1
+
+                if (trigger_cnt % 1000 == 0):
+                    time_elapsed = time.time()-time_start
+                    print(f"Triggered 1000 events, takes {time_elapsed} s")
+                    time_start = time.time()
+
             self.root_pointer.close()
     
     def close(self):
@@ -183,7 +192,7 @@ class H2LaserDigitizer(threading.Thread):
 
         # Setting the number of sample to be collected
         self.sample_number = config.get("sample_number")
-        self.preTriggerSamples = int(config.get("pre_trigger") / 100.) * self.sample_number
+        self.preTriggerSamples = int(config.get("pre_trigger") / 100. * self.sample_number)
         self.postTriggerSamples = self.sample_number - self.preTriggerSamples
         maxsamples = self.sample_number
 
