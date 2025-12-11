@@ -109,7 +109,7 @@ class RootManager:
                 self._buffers[self._buffer_now][k].append(v)
         self._n_buffered[self._buffer_now] += 1
         if self._n_buffered[self._buffer_now] >= self._chunk_size:
-            print("Batch full")
+            # print("Batch full")
             buffer_old = self._buffer_now
             self._q.put(buffer_old)
             self._buffer_now = (self._buffer_now + 1) % self._buffer_n
@@ -128,7 +128,7 @@ class RootManager:
             if buffer_n is self._stop_queue:
                 print("Catch stop signal from queue. Thread stopped.")
                 break
-            print("Catch buffer ", buffer_n, " from queue")
+            # print("Catch buffer ", buffer_n, " from queue")
             self.flush(buffer_n)
             self._q.task_done()
 

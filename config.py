@@ -4,6 +4,7 @@ DIGITIZER_CONFIGS = {
         "model": "3405D",
         "serial": "JY926/0005",
         "channels": ["A", "B", "C"],
+        "channel_name": ["355", "212", "820"],
         "voltage_range": {"A":"2V", "B":"2V", "C":"2V"},      # Check readme
         "offset": {"A":0, "B":0, "C":0},    # V
         "timebase": 2,  # timebase guide (3000 series): 
@@ -22,10 +23,11 @@ DIGITIZER_CONFIGS = {
         "data_path": "data",
     },
     "NOCell": {
-        "run_mode": "contiuous",    # continuous or snapshot
+        "run_mode": "continuous",   # continuous or snapshot
         "model": "2204A",
         "serial": "12017/0359",
         "channels": ["A", "B"],
+        "channel_name": ["NO_cell", "NO_cell_trig"],
         "voltage_range": {"A":"2V", "B":"2V"},      # Check readme
         "timebase": 1,  # Timebase guide for 2204A: 
                         # 0 : 10ns   <- Only available in 1-channel mode

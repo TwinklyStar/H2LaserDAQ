@@ -27,6 +27,10 @@ class H2LaserDigitizer(threading.Thread):
         self.model = config.get("model")
         self.data_path = config.get("data_path")
         self.output_name = config.get("output_name")
+        self.channel_name = {}
+        self.channels = config.get("channels")
+        for i in range(len(self.channels)):
+            self.channel_name[self.channels[i]] = config.get("channel_name")[i]
 
         # Output initilization
         self.csv_pointer = None
@@ -90,19 +94,20 @@ class H2LaserDigitizer(threading.Thread):
 
                 self.root_pointer.fill(**wave)
 
-                if (self.run_mode == "continuous" and trigger_cnt % 1000 == 0):
+                if (self.run_mode == "continuous" and trigger_cnt % 100 == 0):
                     csv_row = {}
                     csv_row['timestamp'] = time.time()
                     for ch_idx in self.channels:
                         csv_row[ch_idx] = np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t
+
+                        # Send latest value to monitor
+                        self.update_queue.put({
+                            "channel_name": self.channel_name[ch_idx],
+                            "timestamp": csv_row['timestamp'],
+                            "value": csv_row[ch_idx]
+                        })
                     self.csv_writer.writerow(csv_row)
                     self.csv_pointer.flush()
-                    # Send latest value to monitor
-                    # self.update_queue.put({
-                    #     "device": self.name,
-                    #     "timestamp": timestamp,
-                    #     "value": value,
-                    # })
 
                 if (self.run_mode == "snapshot"):
                     self.peak_area_buffer.append(np.sum(wave[f"Ch{self.snapshot_channel}"]) * self.delta_t)
@@ -124,7 +129,7 @@ class H2LaserDigitizer(threading.Thread):
 
                 if (trigger_cnt % 1000 == 0):
                     time_elapsed = time.time()-time_start
-                    print(f"{datetime.now()}: trigger rate {1000 / time_elapsed} Hz")
+                    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Trigger rate {1000 / time_elapsed} Hz')
                     time_start = time.time()
 
             self.root_pointer.close()
@@ -151,9 +156,6 @@ class H2LaserDigitizer(threading.Thread):
             # handle = chandle
             self.status["close"] = ps2000.ps2000_close_unit(self.chandle)
             assert_pico2000_ok(self.status["close"])
-
-            # display status returns
-            print(self.status)
 
     def initPico3000(self, config):
         # Create chandle and self.status ready for use
@@ -183,7 +185,7 @@ class H2LaserDigitizer(threading.Thread):
 
             assert_pico_ok(self.status["ChangePowerSource"])
 
-        self.channels = config.get("channels")
+        # self.channels = config.get("channels")
         self.unused_channels = set(["A", "B", "C", "D"]) - set(self.channels)
 
         self.ch_range = {}
@@ -317,7 +319,7 @@ class H2LaserDigitizer(threading.Thread):
             return
 
         print("Start init")
-        self.channels = config.get("channels")
+        # self.channels = config.get("channels")
         self.unused_channels = set(["A", "B"]) - set(self.channels)
 
         self.ch_range = {}
