@@ -16,8 +16,8 @@ class H2MonitorApp:
         self.channels = channels
         self.times = {} 
         self.values = {}
-        self.times = {ch: deque(maxlen=1000) for ch in self.channels}
-        self.values = {ch: deque(maxlen=1000) for ch in self.channels}
+        self.times = {ch: deque(maxlen=2000) for ch in self.channels}
+        self.values = {ch: deque(maxlen=2000) for ch in self.channels}
 
         # TODO: set up GUI window + plots later
         plt.ion()
