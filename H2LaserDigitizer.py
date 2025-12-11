@@ -1,10 +1,11 @@
 # h2_digitizer.py
 import threading
 import ctypes
-from picosdk.ps3000a import ps3000a as ps
+from picosdk.ps3000a import ps3000a
+from picosdk.ps2000 import ps2000
 import numpy as np
 import matplotlib.pyplot as plt
-from picosdk.functions import mV2adc, adc2mV, assert_pico_ok
+from picosdk.functions import mV2adc, adc2mV, assert_pico_ok, assert_pico2000_ok
 import time
 from datetime import datetime
 import glob
@@ -21,6 +22,7 @@ class H2LaserDigitizer(threading.Thread):
         self.trigger_per_file = 10000  # 400 s
 
         # Example: you can pre-extract some config here
+        self.run_mode = config.get("run_mode")
         self.serial = config.get("serial")
         self.model = config.get("model")
         self.data_path = config.get("data_path")
@@ -34,6 +36,15 @@ class H2LaserDigitizer(threading.Thread):
         if self.model == "3405D":
             print("Initialize picoscope 3405D")
             self.initPico3000(config)
+        elif self.model == "2204A":
+            print("Initialize picoscope 2204A")
+            self.initPico2000(config)
+
+        if self.run_mode == "snapshot":
+            self.snapshot_channel = config.get("snapshot_channel")
+            self.refresh_trigger_cnt = config.get("refresh_trigger_cnt")
+            self.peak_area_buffer = []
+
 
 
     def run(self):
@@ -52,16 +63,17 @@ class H2LaserDigitizer(threading.Thread):
             self.root_pointer = picoDAQAssistant.RootManager(filename=root_name, runN=0, chunk_size=1000, sample_num=self.sample_number, add_channels=self.channels)
             self.root_pointer.start_thread()
 
-            # Create csv file
-            csv_fullpath = f"{self.data_path}/csv/{date}.csv"
-            file_exists = os.path.exists(csv_fullpath)
+            if self.run_mode == "continuous":
+                # Create csv file
+                csv_fullpath = f"{self.data_path}/csv/{self.output_name}_{date}.csv"
+                file_exists = os.path.exists(csv_fullpath)
 
-            if self.csv_pointer is not None:    # Create new file
-                self.csv_pointer.close()
-            self.csv_pointer = open(csv_fullpath, "a", newline="")
-            self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+self.channels)
-            if not file_exists: # Create new file
-                self.csv_writer.writeheader()
+                if self.csv_pointer is not None:    # Create new file
+                    self.csv_pointer.close()
+                self.csv_pointer = open(csv_fullpath, "a", newline="")
+                self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+self.channels)
+                if not file_exists: # Create new file
+                    self.csv_writer.writeheader()
 
             trigger_cnt = 0
 
@@ -69,6 +81,8 @@ class H2LaserDigitizer(threading.Thread):
             while (trigger_cnt < self.trigger_per_file and not self.stop_event.is_set()):
                 if self.model == "3405D":
                     self.pico3000BlockCapture()
+                elif self.model == "2204A":
+                    self.pico2000BlockCapture()
 
                 wave = {"Time": self.t}
                 for ch_idx in self.channels:
@@ -76,7 +90,7 @@ class H2LaserDigitizer(threading.Thread):
 
                 self.root_pointer.fill(**wave)
 
-                if (trigger_cnt % 1000 == 0):
+                if (self.run_mode == "continuous" and trigger_cnt % 1000 == 0):
                     csv_row = {}
                     csv_row['timestamp'] = time.time()
                     for ch_idx in self.channels:
@@ -90,27 +104,56 @@ class H2LaserDigitizer(threading.Thread):
                     #     "value": value,
                     # })
 
+                if (self.run_mode == "snapshot"):
+                    self.peak_area_buffer.append(np.sum(wave[f"Ch{self.snapshot_channel}"]) * self.delta_t)
+                    if (trigger_cnt % self.refresh_trigger_cnt == 0):    # Reflesh the plot, show the average peak area in last 4 seconds
+                        area_avg = np.mean(self.peak_area_buffer)
+                        area_std = np.std(self.peak_area_buffer)
+                        self.update_queue.put({
+                            "device": self.name,
+                            "t": self.t,
+                            "ChA": wave["ChA"],
+                            "ChB": wave["ChB"],
+                            "area_avg": area_avg,
+                            "area_std": area_std,
+                            "trigger_cnt": self.refresh_trigger_cnt
+                        })
+
+
                 trigger_cnt += 1
 
                 if (trigger_cnt % 1000 == 0):
                     time_elapsed = time.time()-time_start
-                    print(f"Triggered 1000 events, takes {time_elapsed} s")
+                    print(f"{datetime.now()}: trigger rate {1000 / time_elapsed} Hz")
                     time_start = time.time()
 
             self.root_pointer.close()
     
     def close(self):
-        self.csv_pointer.close()
+        if self.run_mode == "continuous":
+            self.csv_pointer.close()
 
-        # Stops the scope
-        # Handle = chandle
-        self.status["stop"] = ps.ps3000aStop(self.chandle)
-        assert_pico_ok(self.status["stop"])
+        if self.model == "3405D":
+            # Stops the scope
+            # Handle = chandle
+            self.status["stop"] = ps3000a.ps3000aStop(self.chandle)
+            assert_pico_ok(self.status["stop"])
 
-        # Closes the unit
-        # Handle = chandle
-        self.status["close"] = ps.ps3000aCloseUnit(self.chandle)
-        assert_pico_ok(self.status["close"])
+            # Closes the unit
+            # Handle = chandle
+            self.status["close"] = ps3000a.ps3000aCloseUnit(self.chandle)
+            assert_pico_ok(self.status["close"])
+        if self.model == "2204A":
+            self.status["stop"] = ps2000.ps2000_stop(self.chandle)
+            assert_pico2000_ok(self.status["stop"])
+
+            # Close unitDisconnect the scope
+            # handle = chandle
+            self.status["close"] = ps2000.ps2000_close_unit(self.chandle)
+            assert_pico2000_ok(self.status["close"])
+
+            # display status returns
+            print(self.status)
 
     def initPico3000(self, config):
         # Create chandle and self.status ready for use
@@ -118,7 +161,7 @@ class H2LaserDigitizer(threading.Thread):
         self.chandle = ctypes.c_int16()
 
         # Opens the device/s
-        self.status["openunit"] = ps.ps3000aOpenUnit(ctypes.byref(self.chandle), None)
+        self.status["openunit"] = ps3000a.ps3000aOpenUnit(ctypes.byref(self.chandle), None)
 
         try:
             assert_pico_ok(self.status["openunit"])
@@ -130,11 +173,11 @@ class H2LaserDigitizer(threading.Thread):
             # If powerstate is the same as 282 then it will run this if statement
             if powerstate == 282:
                 # Changes the power input to "PICO_POWER_SUPPLY_NOT_CONNECTED"
-                self.status["ChangePowerSource"] = ps.ps3000aChangePowerSource(self.chandle, 282)
+                self.status["ChangePowerSource"] = ps3000a.ps3000aChangePowerSource(self.chandle, 282)
                 # If the powerstate is the same as 286 then it will run this if statement
             elif powerstate == 286:
                 # Changes the power input to "PICO_USB3_0_DEVICE_NON_USB3_0_PORT"
-                self.status["ChangePowerSource"] = ps.ps3000aChangePowerSource(self.chandle, 286)
+                self.status["ChangePowerSource"] = ps3000a.ps3000aChangePowerSource(self.chandle, 286)
             else:
                 raise
 
@@ -146,48 +189,52 @@ class H2LaserDigitizer(threading.Thread):
         self.ch_range = {}
         self.ch_offset = {}
         for ch_idx in self.channels:
-            channel_No = ps.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
-            self.ch_range[ch_idx] = ps.PS3000A_RANGE["PS3000A_"+config.get("voltage_range")[ch_idx]]
-            coupling = ps.PS3000A_COUPLING["PS3000A_DC"]
+            channel_No = ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
+            self.ch_range[ch_idx] = ps3000a.PS3000A_RANGE["PS3000A_"+config.get("voltage_range")[ch_idx]]
+            coupling = ps3000a.PS3000A_COUPLING["PS3000A_DC"]
             enabled = 1  # off: 0, on: 1
             self.ch_offset[ch_idx] = config.get("offset")[ch_idx] # in V
-            self.status["setCh"+ch_idx] = ps.ps3000aSetChannel(self.chandle, channel_No, enabled, coupling, self.ch_range[ch_idx], self.ch_offset[ch_idx])
+            self.status["setCh"+ch_idx] = ps3000a.ps3000aSetChannel(self.chandle, channel_No, enabled, coupling, self.ch_range[ch_idx], self.ch_offset[ch_idx])
             assert_pico_ok(self.status["setCh"+ch_idx])
 
         for ch_idx in self.unused_channels:     # Disable unused channels
-            channel_No = ps.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
-            range = ps.PS3000A_RANGE["PS3000A_2V"]
-            coupling = ps.PS3000A_COUPLING["PS3000A_DC"]
+            channel_No = ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
+            range = ps3000a.PS3000A_RANGE["PS3000A_2V"]
+            coupling = ps3000a.PS3000A_COUPLING["PS3000A_DC"]
             enabled = 0  # off: 0, on: 1
             analog_offset = 0
-            self.status["setCh"+ch_idx] = ps.ps3000aSetChannel(self.chandle, channel_No, enabled, coupling, range, analog_offset)
+            self.status["setCh"+ch_idx] = ps3000a.ps3000aSetChannel(self.chandle, channel_No, enabled, coupling, range, analog_offset)
             assert_pico_ok(self.status["setCh"+ch_idx])
 
 
         # Sets up single trigger
         trigger_enable = 1  # 0 to disable, any other number to enable
         trigger_channel = config.get("trigger_channel")
-        if trigger_channel == "Ext":
-            trig_ch_handle = ps.PS3000A_CHANNEL["PS3000A_EXTERNAL"]
-        else:
-            trig_ch_handle = ps.PS3000A_CHANNEL["PS3000A_CHANNEL_"+trigger_channel]
-
         trigger_level_mV = config.get("trigger_level")
-        trigger_level_ADC = picoDAQAssistant.extTrigmV2Adc(trigger_level_mV)
+        if trigger_channel == "Ext":
+            trig_ch_handle = ps3000a.PS3000A_CHANNEL["PS3000A_EXTERNAL"]
+            trigger_level_ADC = picoDAQAssistant.extTrigmV2Adc(trigger_level_mV)
+        else:
+            trig_ch_handle = ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+trigger_channel]
+            maxADC = ctypes.c_int16()
+            self.status["maximumValue"] = ps3000a.ps3000aMaximumValue(self.chandle, ctypes.byref(maxADC))
+            assert_pico_ok(self.status["maximumValue"])
+            trigger_level_ADC = mV2adc(trigger_level_mV, self.ch_range[trigger_channel], maxADC)
+
         # Finds the max ADC count
         # Handle = self.chandle
         # Value = ctype.byref(maxADC)
         self.maxADC = ctypes.c_int16()
-        self.status["maximumValue"] = ps.ps3000aMaximumValue(self.chandle, ctypes.byref(self.maxADC))
+        self.status["maximumValue"] = ps3000a.ps3000aMaximumValue(self.chandle, ctypes.byref(self.maxADC))
         # assert_pico_ok(self.status["maximumValue"])
         # trigger_level_ADC = mV2adc(trigger_level_mV, chA_range, maxADC)
 
-        # trigger_type = ps.PS3000A_THRESHOLD_DIRECTION["PS3000A_RISING"]
-        trigger_type = ps.PS3000A_THRESHOLD_DIRECTION["PS3000A_"+config.get("trigger_edge")]
+        # trigger_type = ps3000a.PS3000A_THRESHOLD_DIRECTION["PS3000A_RISING"]
+        trigger_type = ps3000a.PS3000A_THRESHOLD_DIRECTION["PS3000A_"+config.get("trigger_edge")]
         trigger_delay = config.get("trigger_delay")   # Number of sample
         auto_trigger = config.get("auto_trigger") # autotrigger wait time (in ms)
-        # self.status["trigger"] = ps.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, chA_channel_No, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
-        self.status["trigger"] = ps.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, trig_ch_handle, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
+        # self.status["trigger"] = ps3000a.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, chA_channel_No, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
+        self.status["trigger"] = ps3000a.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, trig_ch_handle, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
         assert_pico_ok(self.status["trigger"])
 
         # Setting the number of sample to be collected
@@ -215,7 +262,7 @@ class H2LaserDigitizer(threading.Thread):
         self.timebase = config.get("timebase")
         timeIntervalns = ctypes.c_float()
         returnedMaxSamples = ctypes.c_int16()
-        self.status["GetTimebase"] = ps.ps3000aGetTimebase2(self.chandle, self.timebase, maxsamples, ctypes.byref(timeIntervalns), 1, ctypes.byref(returnedMaxSamples), 0)
+        self.status["GetTimebase"] = ps3000a.ps3000aGetTimebase2(self.chandle, self.timebase, maxsamples, ctypes.byref(timeIntervalns), 1, ctypes.byref(returnedMaxSamples), 0)
         assert_pico_ok(self.status["GetTimebase"])
 
         # Creates a overlow location for data
@@ -233,7 +280,7 @@ class H2LaserDigitizer(threading.Thread):
         # Setting the data buffer location for data collection from channel A
         i=0
         for ch_idx in self.channels:
-            self.status["SetDataBuffers"] = ps.ps3000aSetDataBuffers(self.chandle, ps.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
+            self.status["SetDataBuffers"] = ps3000a.ps3000aSetDataBuffers(self.chandle, ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
 , self.bufferMax[ch_idx].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), self.bufferMin[ch_idx].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), maxsamples, 0, 0)
         assert_pico_ok(self.status["SetDataBuffers"])
 
@@ -244,21 +291,138 @@ class H2LaserDigitizer(threading.Thread):
         self.t = np.linspace(0, (self.cmaxSamples.value - 1) * timeIntervalns.value, self.cmaxSamples.value)
         self.delta_t = timeIntervalns.value
 
-    # def initPico2000():
+    def initPico2000(self, config):
+        self.status = {}
+
+        # Open as many 2204A as are connected (call until it returns 0)
+        handles = {}
+        while True:
+            h = ps2000.ps2000_open_unit()
+            if h <= 0:  # 0 = none found, -1 = failed
+                break
+            handles[self.getPico2000Serial(h)] = h
+        
+        print(f">>> {len(handles)} pico2000 detected")
+
+        # Close unmatched ones
+        self.chandle = None
+        for serial, handle in handles.items():
+            if serial == self.serial:
+                self.chandle = ctypes.c_int16(handle)
+                print(f">>> Found specified serial number {self.serial}")
+            else:
+                ps2000.ps2000_close_unit(handle)
+        if self.chandle == None:
+            print(f">>> Specified serial number {self.serial} not found")
+            return
+
+        print("Start init")
+        self.channels = config.get("channels")
+        self.unused_channels = set(["A", "B"]) - set(self.channels)
+
+        self.ch_range = {}
+        self.ch_offset = {"A": 0, "B": 0}
+        for ch_idx in self.channels:
+            channel_No = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+ch_idx]
+            self.ch_range[ch_idx] = ps2000.PS2000_VOLTAGE_RANGE["PS2000_"+config.get("voltage_range")[ch_idx]]
+            coupling = ps2000.PICO_COUPLING["DC"]
+            enabled = 1  # off: 0, on: 1
+            self.status["setCh"+ch_idx] = ps2000.ps2000_set_channel(self.chandle, channel_No, enabled, coupling, self.ch_range[ch_idx])
+            assert_pico2000_ok(self.status["setCh"+ch_idx])
+
+        for ch_idx in self.unused_channels:     # Disable unused channels
+            channel_No = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+ch_idx]
+            range = ps2000.PS2000_VOLTAGE_RANGE["PS2000_2V"]
+            coupling = ps2000.PICO_COUPLING["DC"]
+            enabled = 0  # off: 0, on: 1
+            self.status["setCh"+ch_idx] = ps2000.ps2000_set_channel(self.chandle, channel_No, enabled, coupling, range)
+            assert_pico2000_ok(self.status["setCh"+ch_idx])
+
+
+        # Sets up single trigger
+        trigger_channel = config.get("trigger_channel")
+        trig_ch_handle = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+trigger_channel]
+
+        trigger_level_mV = config.get("trigger_level")
+        # find maximum ADC count value
+        self.maxADC = ctypes.c_int16(32767)
+        trigger_level_ADC = mV2adc(trigger_level_mV, self.ch_range[trigger_channel], self.maxADC)
+        print(trigger_level_ADC)
+
+        pre_trigger = config.get("pre_trigger") * -1
+
+        trigger_type = 0 if config.get("trigger_edge") == "RISING" else 1
+
+        auto_trigger = config.get("auto_trigger") # autotrigger wait time (in ms)
+
+        self.status["trigger"] = ps2000.ps2000_set_trigger(self.chandle, trig_ch_handle, trigger_level_ADC, trigger_type, pre_trigger, auto_trigger)
+        # self.status["trigger"] = ps2000.ps2000_set_trigger(self.chandle, 0, 819, 3, -50, auto_trigger)
+        assert_pico2000_ok(self.status["trigger"])
+
+
+        # Setting the number of sample to be collected
+        self.sample_number = config.get("sample_number")
+        maxsamples = self.sample_number
+
+        # Gets timebase innfomation
+        # Timebase guide for 2204A: 
+        # 0 : 10ns   <- Only available in 1-channel mode
+        # 1 : 20ns  // half
+        # 2 : 40ns  // half
+        # 3 : 80ns  // half
+        # ...
+        self.timebase = config.get("timebase")
+        timeInterval = ctypes.c_int32()
+        timeUnits = ctypes.c_int32()
+        oversample = ctypes.c_int16(1)
+        maxSamplesReturn = ctypes.c_int32()
+        self.status["getTimebase"] = ps2000.ps2000_get_timebase(self.chandle, self.timebase, maxsamples, ctypes.byref(timeInterval), ctypes.byref(timeUnits), oversample, ctypes.byref(maxSamplesReturn))
+        assert_pico2000_ok(self.status["getTimebase"])
+
+        # Creates converted types maxsamples
+        self.cmaxSamples = ctypes.c_int32(maxsamples)
+        self.pico2000_timeIndisposedms = ctypes.c_int32()
+
+        # Create buffers ready for assigning pointers for data collection
+        self.bufferMax = {}
+        self.bufferMax['A'] = np.zeros(shape=maxsamples, dtype=np.int16)
+        self.bufferMax['B'] = np.zeros(shape=maxsamples, dtype=np.int16)
+
+        # Creates the time data
+        self.t = np.linspace(0, (self.cmaxSamples.value - 1) * timeInterval.value, self.cmaxSamples.value)
+        self.delta_t = timeInterval.value
+    
+    def getPico2000Serial(self, handle):
+        # PS2000_GET_UNIT_INFO line=4 returns "batch/serial"
+        buf = ctypes.create_string_buffer(64)
+        ps2000.ps2000_get_unit_info(ctypes.c_int16(handle), buf, ctypes.c_int16(len(buf)), ctypes.c_int16(4))
+        return buf.value.decode(errors="ignore")
+
 
     def pico3000BlockCapture(self):
         # Starts the block capture
-        self.status["runblock"] = ps.ps3000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase, 1, None, 0, None, None)
+        self.status["runblock"] = ps3000a.ps3000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase, 1, None, 0, None, None)
         assert_pico_ok(self.status["runblock"])
 
 
         # Checks data collection to finish the capture
         ready = ctypes.c_int16(0)
         check = ctypes.c_int16(0)
-        self.status["isReady"] = ps.ps3000aIsReady(self.chandle, ctypes.byref(ready))
+        self.status["isReady"] = ps3000a.ps3000aIsReady(self.chandle, ctypes.byref(ready))
         while ready.value == check.value:
             time.sleep(0.01)
-            self.status["isReady"] = ps.ps3000aIsReady(self.chandle, ctypes.byref(ready))
+            self.status["isReady"] = ps3000a.ps3000aIsReady(self.chandle, ctypes.byref(ready))
 
-        self.status["GetValues"] = ps.ps3000aGetValues(self.chandle, 0, ctypes.byref(self.cmaxSamples), 0, 0, 0, ctypes.byref(self.overflow))
+        self.status["GetValues"] = ps3000a.ps3000aGetValues(self.chandle, 0, ctypes.byref(self.cmaxSamples), 0, 0, 0, ctypes.byref(self.overflow))
         assert_pico_ok(self.status["GetValues"])
+    
+    def pico2000BlockCapture(self):
+        oversample = ctypes.c_int16(1)
+        self.status["runBlock"] = ps2000.ps2000_run_block(self.chandle, self.sample_number, self.timebase, oversample, ctypes.byref(self.pico2000_timeIndisposedms))
+        assert_pico2000_ok(self.status["runBlock"])
+        # ready = 0
+        while ps2000.ps2000_ready(self.chandle) == 0:
+            time.sleep(0.01)
+
+        self.status["getValues"] = ps2000.ps2000_get_values(self.chandle, self.bufferMax['A'].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), self.bufferMax['B'].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), None, None, ctypes.byref(oversample), self.cmaxSamples)
+        assert_pico2000_ok(self.status["getValues"])

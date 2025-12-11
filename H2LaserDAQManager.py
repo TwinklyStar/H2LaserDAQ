@@ -12,7 +12,7 @@ class H2LaserDAQManager:
         """
         self.update_queue = queue.Queue()
         self.stop_event = threading.Event()
-        self.workers = []
+        self.workers = {}
 
         for name, cfg in digitizer_configs.items():
             worker = H2LaserDigitizer(
@@ -21,14 +21,14 @@ class H2LaserDAQManager:
                 update_queue=self.update_queue,
                 stop_event=self.stop_event,
             )
-            self.workers.append(worker)
+            self.workers[name]=worker
 
     def start_all(self):
-        for w in self.workers:
+        for w in self.workers.values():
             w.start()
 
     def stop_all(self):
         self.stop_event.set()
-        for w in self.workers:
+        for w in self.workers.values():
             w.join()
             w.close()

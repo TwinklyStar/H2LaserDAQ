@@ -153,7 +153,7 @@ class RootManager:
                     raise ValueError(f"Unsupported scalar type '{base}' for branch '{name}'")
                 out[name] = np.asarray(data, dtype=self._scalar_dtypes[base])
 
-        print("Conversion takes: ", time.time()-time_start, " secs")
+        # print("Conversion takes: ", time.time()-time_start, " secs")
         # Extend once per flush
         self._tree.extend(out)
 
@@ -168,7 +168,7 @@ class RootManager:
         else:
             self._buffers[buffer_n] = {k: [] for k in self._branch.keys()}
         self._n_buffered[buffer_n] = 0
-        print("Extend takes: ", time.time()-time_start, " secs")
+        # print("Extend takes: ", time.time()-time_start, " secs")
 
     def close(self):
         self._q.join()                  # Wait for all buffer filled to tree
@@ -208,6 +208,10 @@ def fastAdc2mV(bufferADC, range, maxADC, offset=0):
     bufferV = bufferADC.astype('int64') * vRange / maxADC.value - offset
     
     return bufferV
+
+def getVoltageRange(range, offset=0):
+    channelInputRanges = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000]
+    return [-channelInputRanges[range]-offset, channelInputRanges[range]-offset]
 
 def extTrigmV2Adc(voltage_mv):
     return int(voltage_mv / 1000. / 5 * 32767)

@@ -1,5 +1,6 @@
 DIGITIZER_CONFIGS = {
     "DET10A2": {
+        "run_mode": "continuous",   # continuous or snapshot
         "model": "3405D",
         "serial": "JY926/0005",
         "channels": ["A", "B", "C"],
@@ -16,25 +17,30 @@ DIGITIZER_CONFIGS = {
         "pre_trigger": 10,          # trigger location in waveform, from 0-100 (%). 0: trigger at first sample, 100: trigger at last sample
         "trigger_edge": "RISING",   # "RISING" or "FALLING"
         "trigger_delay": 0,         # For example, if delay = 100, the scope would wait 100 sample periods before sampling
-        "auto_trigger": 0,          # in ms. Waiting time for auto trigger if no trigger comes
-        "output_name": "test01",
+        "auto_trigger": 0,          # in ms. Waiting time for auto trigger if no trigger comes. 0 means waiting infinitely
+        "output_name": "ps3000test01",
         "data_path": "data",
-
     },
-    # "NOCell": {
-    #     "Model": "2204A",
-    #     "serial": "JY926/0005",
-    #     "channels": ["A", "B"],
-    #     "voltage_range": "2V",      # Check readme
-    #     "sampling_rate": 250e6,     # Hz
-    #     "sample_number": 1000,      # number of points per waveform
-    #     "trigger_channel": "A",     # "A" "B" "C" "D" "Ext"
-    #     "trigger_level": 0,         # mV
-    #     "pre_trigger": 10,          # trigger location in waveform, from 0-100 (%). 0: trigger at first sample, 100: trigger at last sample
-    #     "trigger_edge": "RISING",   # "RISING" or "FALLING"
-    #     "auto_trigger": 0,          # in ms. Waiting time for auto trigger if no trigger comes
-    #     "output_name": "test01",
-    #     "csv_path": "data/csv",
-    #     "root_path": "data/root"
-    # },
+    "NOCell": {
+        "run_mode": "contiuous",    # continuous or snapshot
+        "model": "2204A",
+        "serial": "12017/0359",
+        "channels": ["A", "B"],
+        "voltage_range": {"A":"2V", "B":"2V"},      # Check readme
+        "timebase": 1,  # Timebase guide for 2204A: 
+                        # 0 : 10ns   <- Only available in 1-channel mode
+                        # 1 : 20ns  // half
+                        # 2 : 40ns  // half
+                        # 3 : 80ns  // half
+                        # ...
+        "sample_number": 1000,      # number of points per waveform
+        "trigger_channel": "A",     # "A" "B"
+        "trigger_level": 200,         # mV
+        "pre_trigger": 10,          # trigger location in waveform, from 0-100 (%). 0: trigger at first sample, 100: trigger at last sample
+        "trigger_edge": "RISING",   # "RISING" or "FALLING"
+        # "trigger_edge": "FALLING",   # "RISING" or "FALLING"
+        "auto_trigger": 1000,          # in ms. Waiting time for auto trigger if no trigger comes. 0 means waiting infinitely
+        "output_name": "ps2000test01",
+        "data_path": "data",
+    },
 }

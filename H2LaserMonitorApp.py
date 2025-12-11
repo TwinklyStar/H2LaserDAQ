@@ -9,7 +9,6 @@ class H2MonitorApp:
         """
         self.monitor_config = monitor_config
         self.update_queue = update_queue
-
         self.time_window_default = monitor_config.get("time_window_default", "1h")
         self.time_windows = monitor_config.get("time_windows", [])
         self.refresh_interval = monitor_config.get("refresh_interval_sec", 1.0)
