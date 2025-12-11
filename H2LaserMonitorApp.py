@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
 import queue
+from collections import deque
 
 class H2MonitorApp:
     def __init__(self, channels, update_queue):
@@ -15,8 +16,8 @@ class H2MonitorApp:
         self.channels = channels
         self.times = {} 
         self.values = {}
-        self.times = {ch:[] for ch in self.channels}
-        self.values = {ch:[] for ch in self.channels}
+        self.times = {ch: deque(maxlen=1000) for ch in self.channels}
+        self.values = {ch: deque(maxlen=1000) for ch in self.channels}
 
         # TODO: set up GUI window + plots later
         plt.ion()
