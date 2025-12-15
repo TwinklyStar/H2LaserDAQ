@@ -49,10 +49,14 @@ class H2LaserDigitizer(threading.Thread):
         except DigitizerInitError:
             raise
 
+        if self.run_mode == "continuous":
+            self.peak_area_buffer = {ch : 0 for ch in self.channels}
+
         if self.run_mode == "snapshot":
             self.snapshot_channel = config.get("snapshot_channel")
             self.refresh_trigger_cnt = config.get("refresh_trigger_cnt")
             self.peak_area_buffer = []
+            self.avg_wave_buffer = {ch: np.zeros(self.sample_number) for ch in self.channels}
 
 
 
@@ -104,35 +108,48 @@ class H2LaserDigitizer(threading.Thread):
 
                 self.root_pointer.fill(**wave)
 
-                if (self.run_mode == "continuous" and trigger_cnt % 100 == 0):
-                    csv_row = {}
-                    csv_row['timestamp'] = time.time()
+                if (self.run_mode == "continuous"):
                     for ch_idx in self.channels:
-                        csv_row[ch_idx] = np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t
-
-                        # Send latest value to monitor
-                        self.update_queue.put({
-                            "channel_name": self.channel_name[ch_idx],
-                            "timestamp": csv_row['timestamp'],
-                            "value": csv_row[ch_idx]
-                        })
-                    self.csv_writer.writerow(csv_row)
-                    self.csv_pointer.flush()
+                        self.peak_area_buffer[ch_idx] += np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t / 100
+                    
+                    if (trigger_cnt % 100 == 0):
+                        csv_row = {}
+                        csv_row['timestamp'] = time.time()
+                        for ch_idx in self.channels:
+                            csv_row[ch_idx] = self.peak_area_buffer[ch_idx]
+                            # Send latest value to monitor
+                            self.update_queue.put({
+                                "channel_name": self.channel_name[ch_idx],
+                                "timestamp": csv_row['timestamp'],
+                                "value": csv_row[ch_idx]
+                            })
+                        for ch_idx in self.channels:
+                            self.peak_area_buffer[ch_idx] = 0
+                        
+                        self.csv_writer.writerow(csv_row)
+                        self.csv_pointer.flush()
 
                 if (self.run_mode == "snapshot"):
                     self.peak_area_buffer.append(np.sum(wave[f"Ch{self.snapshot_channel}"]) * self.delta_t)
-                    if (trigger_cnt % self.refresh_trigger_cnt == 0):    # Reflesh the plot, show the average peak area in last 4 seconds
+                    for ch_idx in self.channels:
+                        self.avg_wave_buffer[ch_idx] += wave[f"Ch{self.snapshot_channel}"] / self.refresh_trigger_cnt
+                    if (trigger_cnt % self.refresh_trigger_cnt == 0):    # Reflesh the plot, show the average peak area during last refresh period
                         area_avg = np.mean(self.peak_area_buffer)
                         area_std = np.std(self.peak_area_buffer)
-                        self.update_queue.put({
+                        queue_dic = {
                             "device": self.name,
                             "t": self.t,
-                            "ChA": wave["ChA"],
-                            "ChB": wave["ChB"],
                             "area_avg": area_avg,
                             "area_std": area_std,
                             "trigger_cnt": self.refresh_trigger_cnt
-                        })
+                        }
+                        for ch_idx in self.channels:
+                            queue_dic[f"Ch{ch_idx}"] = self.avg_wave_buffer[ch_idx].copy()
+
+                        self.update_queue.put(queue_dic)
+
+                        for ch_idx in self.channels:
+                            self.avg_wave_buffer[ch_idx].fill(0)
 
 
                 trigger_cnt += 1
@@ -467,7 +484,7 @@ class H2LaserDigitizer(threading.Thread):
         self.status["isReady"] = ps3000a.ps3000aIsReady(self.chandle, ctypes.byref(ready))
         trig_timeout = 10
         trig_start = time.time()
-        while ready.value == check.value:
+        while ready.value == check.value and not self.stop_event.is_set():
             if time.time() - trig_start > trig_timeout:
                 print(f"[WARN]: {self.model} {self.serial}: No trigger for {trig_timeout} seconds")
                 trig_timeout += 10
@@ -486,7 +503,7 @@ class H2LaserDigitizer(threading.Thread):
 
         trig_timeout = 10
         trig_start = time.time()
-        while ps2000.ps2000_ready(self.chandle) == 0:
+        while ps2000.ps2000_ready(self.chandle) == 0 and not self.stop_event.is_set():
             if time.time() - trig_start > trig_timeout:
                 print(f"[WARN]: {self.model} {self.serial}: No trigger for {trig_timeout} seconds")
                 trig_timeout += 10

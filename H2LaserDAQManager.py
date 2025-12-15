@@ -39,7 +39,7 @@ class H2LaserDAQManager:
         self.stop_event.set()
         print("[EXIT] Stopping DAQ threads...")
         for w in self.workers.values():
-            print(f"[EXIT] Stopping digitizer {w.model} {w.series}")
+            print(f"[EXIT] Stopping digitizer {w.model} {w.serial}")
             w.join()
             w.close()
         print("[EXIT] All digitizer stopped")
