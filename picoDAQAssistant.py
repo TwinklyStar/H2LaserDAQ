@@ -20,6 +20,7 @@ class RootManager:
     def __init__(self, filename, runN, sample_num, add_channels=("A","B","C","D"), chunk_size=1000):
         self._runN = runN
         self._file = uproot.recreate(filename)
+        self._filename = filename
         self._chConfig = []
         if (sample_num>0):
             self._branch = {
@@ -175,6 +176,9 @@ class RootManager:
         self.flush(self._buffer_now)    # Flush remaining data
         self._q.put(self._stop_queue)
         self._file.close()
+
+    def getName(self):
+        return self._filename
 
 class StreamManager:
     def SetNoiseRMS(self, RMS):

@@ -19,7 +19,7 @@ class H2MonitorApp:
         self.times = {ch: deque(maxlen=2000) for ch in self.channels}
         self.values = {ch: deque(maxlen=2000) for ch in self.channels}
 
-        # TODO: set up GUI window + plots later
+        print("[MONITOR] Starting MonitorApp...")
         plt.ion()
         n = len(self.channels)
         self.fig, axes = plt.subplots(n, 1, sharex=True,
@@ -93,4 +93,4 @@ class H2MonitorApp:
         except KeyboardInterrupt:
             plt.ioff()
             plt.close(self.fig)
-            print("Monitor stopped.")
+            print("[EXIT] Ctrl+C received. Monitor closed")

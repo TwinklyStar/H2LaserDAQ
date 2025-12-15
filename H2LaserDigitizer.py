@@ -12,6 +12,8 @@ import glob
 import os
 import csv
 import picoDAQAssistant
+from H2Exceptions import DigitizerInitError
+from utility import log
 
 class H2LaserDigitizer(threading.Thread):
     def __init__(self, name, config, update_queue, stop_event):
@@ -29,6 +31,8 @@ class H2LaserDigitizer(threading.Thread):
         self.output_name = config.get("output_name")
         self.channel_name = {}
         self.channels = config.get("channels")
+        print(f"[INIT] Initializing digitizer {self.model} {self.serial}")
+
         for i in range(len(self.channels)):
             self.channel_name[self.channels[i]] = config.get("channel_name")[i]
 
@@ -37,12 +41,13 @@ class H2LaserDigitizer(threading.Thread):
         self.root_pointer = None
 
         # TODO: init PicoScope handle etc.
-        if self.model == "3405D":
-            print("Initialize picoscope 3405D")
-            self.initPico3000(config)
-        elif self.model == "2204A":
-            print("Initialize picoscope 2204A")
-            self.initPico2000(config)
+        try:
+            if self.model == "3405D":
+                self.initPico3000(config)
+            elif self.model == "2204A":
+                self.initPico2000(config)
+        except DigitizerInitError:
+            raise
 
         if self.run_mode == "snapshot":
             self.snapshot_channel = config.get("snapshot_channel")
@@ -56,6 +61,7 @@ class H2LaserDigitizer(threading.Thread):
         # TODO: connect + configure digitizer here once
         # self._connect_to_digitizer()
 
+        date_past = ""
         while not self.stop_event.is_set():
             # TODO: acquire waveform, compute integrated area
             date = datetime.today().strftime("%y%m%d")
@@ -66,18 +72,22 @@ class H2LaserDigitizer(threading.Thread):
 
             self.root_pointer = picoDAQAssistant.RootManager(filename=root_name, runN=0, chunk_size=1000, sample_num=self.sample_number, add_channels=self.channels)
             self.root_pointer.start_thread()
+            print(f"[I/O] Opening ROOT file {root_name}")
 
-            if self.run_mode == "continuous":
+            if self.run_mode == "continuous" and date_past != date:
                 # Create csv file
                 csv_fullpath = f"{self.data_path}/csv/{self.output_name}_{date}.csv"
                 file_exists = os.path.exists(csv_fullpath)
 
                 if self.csv_pointer is not None:    # Create new file
                     self.csv_pointer.close()
+                    print(f"[I/O] Data saved to CSV file {csv_fullpath}. File closed")
                 self.csv_pointer = open(csv_fullpath, "a", newline="")
+                print(f"[I/O] Opening CSV file {csv_fullpath}")
                 self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+self.channels)
                 if not file_exists: # Create new file
                     self.csv_writer.writeheader()
+                date_past = date
 
             trigger_cnt = 0
 
@@ -129,14 +139,16 @@ class H2LaserDigitizer(threading.Thread):
 
                 if (trigger_cnt % 1000 == 0):
                     time_elapsed = time.time()-time_start
-                    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Trigger rate {1000 / time_elapsed} Hz')
+                    print(f'[DAQ] Health: {datetime.now().strftime("%y-%m-%d %H:%M:%S")} Trigger rate {1000 / time_elapsed} Hz')
                     time_start = time.time()
 
             self.root_pointer.close()
+            print(f"[I/O] Data saved to ROOT file {self.root_pointer.getName()}. File closed")
     
     def close(self):
         if self.run_mode == "continuous":
             self.csv_pointer.close()
+            print(f"[I/O] Data saved to CSV file {self.csv_pointer.name}. File closed")
 
         if self.model == "3405D":
             # Stops the scope
@@ -181,15 +193,17 @@ class H2LaserDigitizer(threading.Thread):
                 # Changes the power input to "PICO_USB3_0_DEVICE_NON_USB3_0_PORT"
                 self.status["ChangePowerSource"] = ps3000a.ps3000aChangePowerSource(self.chandle, 286)
             else:
-                raise
+                raise DigitizerInitError(f"[ERROR] Specified digitizer {self.model} {self.serial} not found")
 
             assert_pico_ok(self.status["ChangePowerSource"])
+        print(f"[INIT] Specified digitizer {self.model} {self.serial} found")
 
         # self.channels = config.get("channels")
         self.unused_channels = set(["A", "B", "C", "D"]) - set(self.channels)
 
         self.ch_range = {}
         self.ch_offset = {}
+        print(f"[INIT] Setting channels: {self.channels}")
         for ch_idx in self.channels:
             channel_No = ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
             self.ch_range[ch_idx] = ps3000a.PS3000A_RANGE["PS3000A_"+config.get("voltage_range")[ch_idx]]
@@ -197,7 +211,10 @@ class H2LaserDigitizer(threading.Thread):
             enabled = 1  # off: 0, on: 1
             self.ch_offset[ch_idx] = config.get("offset")[ch_idx] # in V
             self.status["setCh"+ch_idx] = ps3000a.ps3000aSetChannel(self.chandle, channel_No, enabled, coupling, self.ch_range[ch_idx], self.ch_offset[ch_idx])
-            assert_pico_ok(self.status["setCh"+ch_idx])
+            try:
+                assert_pico_ok(self.status["setCh"+ch_idx])
+            except:
+                raise DigitizerInitError(f"[ERROR] Fail to initizlize Channel {ch_idx}")
 
         for ch_idx in self.unused_channels:     # Disable unused channels
             channel_No = ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
@@ -210,9 +227,12 @@ class H2LaserDigitizer(threading.Thread):
 
 
         # Sets up single trigger
+        print(f"[INIT] Setting trigger")
         trigger_enable = 1  # 0 to disable, any other number to enable
         trigger_channel = config.get("trigger_channel")
         trigger_level_mV = config.get("trigger_level")
+        print(f"\tTrigger channel: {trigger_channel}")
+        print(f"\tTrigger level {trigger_level_mV} mV")
         if trigger_channel == "Ext":
             trig_ch_handle = ps3000a.PS3000A_CHANNEL["PS3000A_EXTERNAL"]
             trigger_level_ADC = picoDAQAssistant.extTrigmV2Adc(trigger_level_mV)
@@ -233,14 +253,20 @@ class H2LaserDigitizer(threading.Thread):
 
         # trigger_type = ps3000a.PS3000A_THRESHOLD_DIRECTION["PS3000A_RISING"]
         trigger_type = ps3000a.PS3000A_THRESHOLD_DIRECTION["PS3000A_"+config.get("trigger_edge")]
+        print(f"\tTrigger type: {trigger_type}")
         trigger_delay = config.get("trigger_delay")   # Number of sample
         auto_trigger = config.get("auto_trigger") # autotrigger wait time (in ms)
         # self.status["trigger"] = ps3000a.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, chA_channel_No, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
         self.status["trigger"] = ps3000a.ps3000aSetSimpleTrigger(self.chandle, trigger_enable, trig_ch_handle, trigger_level_ADC, trigger_type, trigger_delay, auto_trigger)
-        assert_pico_ok(self.status["trigger"])
+        try:
+            assert_pico_ok(self.status["trigger"])
+        except:
+            raise DigitizerInitError("[ERROR] Fail to set trigger")
 
         # Setting the number of sample to be collected
+        print(f"[INIT] Setting sampling configuration")
         self.sample_number = config.get("sample_number")
+        print(f"\tSample number: {self.sample_number}")
         self.preTriggerSamples = int(config.get("pre_trigger") / 100. * self.sample_number)
         self.postTriggerSamples = self.sample_number - self.preTriggerSamples
         maxsamples = self.sample_number
@@ -265,7 +291,12 @@ class H2LaserDigitizer(threading.Thread):
         timeIntervalns = ctypes.c_float()
         returnedMaxSamples = ctypes.c_int16()
         self.status["GetTimebase"] = ps3000a.ps3000aGetTimebase2(self.chandle, self.timebase, maxsamples, ctypes.byref(timeIntervalns), 1, ctypes.byref(returnedMaxSamples), 0)
-        assert_pico_ok(self.status["GetTimebase"])
+        try:
+            assert_pico_ok(self.status["GetTimebase"])
+        except:
+            raise DigitizerInitError(f"[ERROR] Incorrect timebase {self.timebase}")
+
+        print(f"\tSample interval: {timeIntervalns} ns")
 
         # Creates a overlow location for data
         overflow = ctypes.c_int16()
@@ -280,11 +311,13 @@ class H2LaserDigitizer(threading.Thread):
             self.bufferMin[ch_idx] = np.zeros(shape=maxsamples, dtype=np.int16)
 
         # Setting the data buffer location for data collection from channel A
-        i=0
         for ch_idx in self.channels:
             self.status["SetDataBuffers"] = ps3000a.ps3000aSetDataBuffers(self.chandle, ps3000a.PS3000A_CHANNEL["PS3000A_CHANNEL_"+ch_idx]
 , self.bufferMax[ch_idx].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), self.bufferMin[ch_idx].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), maxsamples, 0, 0)
-        assert_pico_ok(self.status["SetDataBuffers"])
+        try:
+            assert_pico_ok(self.status["SetDataBuffers"])
+        except:
+            raise("[ERROR] Fail to set data buffer")
 
         # Creates a overlow location for data
         self.overflow = (ctypes.c_int16 * 10)()
@@ -292,6 +325,8 @@ class H2LaserDigitizer(threading.Thread):
         # Creates the time data
         self.t = np.linspace(0, (self.cmaxSamples.value - 1) * timeIntervalns.value, self.cmaxSamples.value)
         self.delta_t = timeIntervalns.value
+
+        print("[INIT] Initialization complete")
 
     def initPico2000(self, config):
         self.status = {}
@@ -311,26 +346,28 @@ class H2LaserDigitizer(threading.Thread):
         for serial, handle in handles.items():
             if serial == self.serial:
                 self.chandle = ctypes.c_int16(handle)
-                print(f">>> Found specified serial number {self.serial}")
+                print(f"[INIT] Specified digitizer {self.model} {self.serial} found")
             else:
                 ps2000.ps2000_close_unit(handle)
         if self.chandle == None:
-            print(f">>> Specified serial number {self.serial} not found")
-            return
+            raise DigitizerInitError(f"[ERROR] Specified digitizer {self.model} {self.serial} not found")
 
-        print("Start init")
         # self.channels = config.get("channels")
         self.unused_channels = set(["A", "B"]) - set(self.channels)
 
         self.ch_range = {}
         self.ch_offset = {"A": 0, "B": 0}
+        print(f"[INIT] Setting channels: {self.channels}")
         for ch_idx in self.channels:
             channel_No = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+ch_idx]
             self.ch_range[ch_idx] = ps2000.PS2000_VOLTAGE_RANGE["PS2000_"+config.get("voltage_range")[ch_idx]]
             coupling = ps2000.PICO_COUPLING["DC"]
             enabled = 1  # off: 0, on: 1
             self.status["setCh"+ch_idx] = ps2000.ps2000_set_channel(self.chandle, channel_No, enabled, coupling, self.ch_range[ch_idx])
-            assert_pico2000_ok(self.status["setCh"+ch_idx])
+            try:
+                assert_pico2000_ok(self.status["setCh"+ch_idx])
+            except:
+                raise DigitizerInitError(f"[ERROR] Fail to initizlize Channel {ch_idx}")
 
         for ch_idx in self.unused_channels:     # Disable unused channels
             channel_No = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+ch_idx]
@@ -342,29 +379,39 @@ class H2LaserDigitizer(threading.Thread):
 
 
         # Sets up single trigger
+        print(f"[INIT] Setting trigger")
         trigger_channel = config.get("trigger_channel")
         trig_ch_handle = ps2000.PS2000_CHANNEL["PS2000_CHANNEL_"+trigger_channel]
+        print(f"\tTrigger channel: {trigger_channel}")
 
         trigger_level_mV = config.get("trigger_level")
+        print(f"\tTrigger level {trigger_level_mV} mV")
         # find maximum ADC count value
         self.maxADC = ctypes.c_int16(32767)
         trigger_level_ADC = mV2adc(trigger_level_mV, self.ch_range[trigger_channel], self.maxADC)
-        print(trigger_level_ADC)
+        # print(trigger_level_ADC)
 
         pre_trigger = config.get("pre_trigger") * -1
 
         trigger_type = 0 if config.get("trigger_edge") == "RISING" else 1
+        trigger_str = "RISING" if trigger_type == 0 else "FALLING"
+        print(f"\tTrigger type: {trigger_str}")
 
         auto_trigger = config.get("auto_trigger") # autotrigger wait time (in ms)
 
         self.status["trigger"] = ps2000.ps2000_set_trigger(self.chandle, trig_ch_handle, trigger_level_ADC, trigger_type, pre_trigger, auto_trigger)
         # self.status["trigger"] = ps2000.ps2000_set_trigger(self.chandle, 0, 819, 3, -50, auto_trigger)
-        assert_pico2000_ok(self.status["trigger"])
+        try:
+            assert_pico2000_ok(self.status["trigger"])
+        except:
+            raise DigitizerInitError("[ERROR] Fail to set trigger")
 
 
+        print(f"[INIT] Setting sampling configuration")
         # Setting the number of sample to be collected
         self.sample_number = config.get("sample_number")
         maxsamples = self.sample_number
+        print(f"\tSample number: {self.sample_number}")
 
         # Gets timebase innfomation
         # Timebase guide for 2204A: 
@@ -379,7 +426,12 @@ class H2LaserDigitizer(threading.Thread):
         oversample = ctypes.c_int16(1)
         maxSamplesReturn = ctypes.c_int32()
         self.status["getTimebase"] = ps2000.ps2000_get_timebase(self.chandle, self.timebase, maxsamples, ctypes.byref(timeInterval), ctypes.byref(timeUnits), oversample, ctypes.byref(maxSamplesReturn))
-        assert_pico2000_ok(self.status["getTimebase"])
+        try:
+            assert_pico2000_ok(self.status["getTimebase"])
+        except:
+            raise DigitizerInitError(f"[ERROR] Incorrect timebase {self.timebase}")
+
+        print(f"\tSample interval: {timeInterval} ns")
 
         # Creates converted types maxsamples
         self.cmaxSamples = ctypes.c_int32(maxsamples)
@@ -393,6 +445,8 @@ class H2LaserDigitizer(threading.Thread):
         # Creates the time data
         self.t = np.linspace(0, (self.cmaxSamples.value - 1) * timeInterval.value, self.cmaxSamples.value)
         self.delta_t = timeInterval.value
+
+        print("[INIT] Initialization complete")
     
     def getPico2000Serial(self, handle):
         # PS2000_GET_UNIT_INFO line=4 returns "batch/serial"
@@ -411,9 +465,15 @@ class H2LaserDigitizer(threading.Thread):
         ready = ctypes.c_int16(0)
         check = ctypes.c_int16(0)
         self.status["isReady"] = ps3000a.ps3000aIsReady(self.chandle, ctypes.byref(ready))
+        trig_timeout = 10
+        trig_start = time.time()
         while ready.value == check.value:
+            if time.time() - trig_start > trig_timeout:
+                print(f"[WARN]: {self.model} {self.serial}: No trigger for {trig_timeout} seconds")
+                trig_timeout += 10
             time.sleep(0.01)
             self.status["isReady"] = ps3000a.ps3000aIsReady(self.chandle, ctypes.byref(ready))
+
 
         self.status["GetValues"] = ps3000a.ps3000aGetValues(self.chandle, 0, ctypes.byref(self.cmaxSamples), 0, 0, 0, ctypes.byref(self.overflow))
         assert_pico_ok(self.status["GetValues"])
@@ -423,7 +483,13 @@ class H2LaserDigitizer(threading.Thread):
         self.status["runBlock"] = ps2000.ps2000_run_block(self.chandle, self.sample_number, self.timebase, oversample, ctypes.byref(self.pico2000_timeIndisposedms))
         assert_pico2000_ok(self.status["runBlock"])
         # ready = 0
+
+        trig_timeout = 10
+        trig_start = time.time()
         while ps2000.ps2000_ready(self.chandle) == 0:
+            if time.time() - trig_start > trig_timeout:
+                print(f"[WARN]: {self.model} {self.serial}: No trigger for {trig_timeout} seconds")
+                trig_timeout += 10
             time.sleep(0.01)
 
         self.status["getValues"] = ps2000.ps2000_get_values(self.chandle, self.bufferMax['A'].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), self.bufferMax['B'].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)), None, None, ctypes.byref(oversample), self.cmaxSamples)
