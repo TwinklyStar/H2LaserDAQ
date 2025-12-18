@@ -133,6 +133,7 @@ class H2LaserDigitizer(threading.Thread):
 
                         for ch_idx in self.channels:
                             self.avg_wave_buffer[ch_idx].fill(0)
+                            self.peak_area_buffer[ch_idx] = 0
                         
                         self.csv_writer.writerow(csv_row)
                         self.csv_pointer.flush()
