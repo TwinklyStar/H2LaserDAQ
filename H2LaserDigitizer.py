@@ -98,6 +98,7 @@ class H2LaserDigitizer(threading.Thread):
 
             time_start = time.time()
             while (trigger_cnt < self.trigger_per_file and not self.stop_event.is_set()):
+                trigger_cnt += 1
                 if self.model == "3405D":
                     self.pico3000BlockCapture()
                 elif self.model == "2204A":
@@ -159,7 +160,6 @@ class H2LaserDigitizer(threading.Thread):
                             self.avg_wave_buffer[ch_idx].fill(0)
 
 
-                trigger_cnt += 1
 
                 if (trigger_cnt % 1000 == 0):
                     time_elapsed = time.time()-time_start
