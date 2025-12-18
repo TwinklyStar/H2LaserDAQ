@@ -126,7 +126,7 @@ class H2LaserDigitizer(threading.Thread):
                                 "timestamp": csv_row['timestamp'],
                                 "value": csv_row[ch_idx],
                                 "wfm_t": self.t,
-                                "wfm": self.peak_area_buffer[ch_idx].copy()
+                                "wfm": self.avg_wave_buffer[ch_idx].copy()
                             }
                         
                         self.update_queue.put(queue_dic)
