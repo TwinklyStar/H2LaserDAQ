@@ -57,7 +57,7 @@ class H2MonitorApp:
             line_wfm, = ax.plot([], [], marker=".", linestyle="-")
             ax.set_ylabel(ch)
             self.axes_wfm[ch] = ax
-            self.lines_wfm[ch] = line
+            self.lines_wfm[ch] = line_wfm
 
         axes_wfm[-1].set_xlabel("Time [ns]")
 
