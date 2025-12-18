@@ -500,7 +500,8 @@ class H2LaserDigitizer(threading.Thread):
 
 
         self.status["GetValues"] = ps3000a.ps3000aGetValues(self.chandle, 0, ctypes.byref(self.cmaxSamples), 0, 0, 0, ctypes.byref(self.overflow))
-        assert_pico_ok(self.status["GetValues"])
+        if not self.stop_event.is_set():
+            assert_pico_ok(self.status["GetValues"])
     
     def pico2000BlockCapture(self):
         oversample = ctypes.c_int16(1)
