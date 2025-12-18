@@ -85,8 +85,8 @@ class H2MonitorApp:
                     ch = item["channel_name"]       
                     ts = item["timestamp"]
                     val = item["value"]
-                    self.wvm_t = item["wvm_t"]
-                    self.wvm = item["wvm"]
+                    self.wfm_t = item["wfm_t"]
+                    self.wfm = item["wfm"]
 
                     if ch not in self.channels:
                         continue

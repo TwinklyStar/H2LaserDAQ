@@ -125,8 +125,8 @@ class H2LaserDigitizer(threading.Thread):
                                 "channel_name": self.channel_name[ch_idx],
                                 "timestamp": csv_row['timestamp'],
                                 "value": csv_row[ch_idx],
-                                "wvm_t": self.t,
-                                "wvm": self.peak_area_buffer[ch_idx].copy()
+                                "wfm_t": self.t,
+                                "wfm": self.peak_area_buffer[ch_idx].copy()
                             }
                         
                         self.update_queue.put(queue_dic)
