@@ -44,7 +44,6 @@ class H2MonitorApp:
         self.fig.autofmt_xdate()
         self.fig.suptitle("H2Laser DAQ Monitor")
 
-        self.running = False
 
         self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
                                       figsize=(8, 2.5 * n))
@@ -63,6 +62,8 @@ class H2MonitorApp:
         axes_wfm[-1].set_xlabel("Time [ns]")
 
         self.fig_wfm.suptitle("H2Laser Waveform Monitor")
+
+        self.running = False
 
         # stop loop when close the GUI
         def on_close(event):
@@ -122,4 +123,5 @@ class H2MonitorApp:
         except KeyboardInterrupt:
             plt.ioff()
             plt.close(self.fig)
+            plt.close(self.fig_wfm)
             print("[EXIT] Ctrl+C received. Monitor closed")
