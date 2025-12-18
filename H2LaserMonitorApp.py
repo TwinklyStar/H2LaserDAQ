@@ -46,10 +46,29 @@ class H2MonitorApp:
 
         self.running = False
 
+        self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
+                                      figsize=(8, 2.5 * n))
+        if n == 1:
+            axes_wfm = [axes_wfm]
+
+        self.axes_wfm = {}
+        self.lines_wfm = {}
+
+        for ax, ch in zip(axes_wfm, channels):
+            line_wfm, = ax.plot([], [], marker=".", linestyle="-")
+            ax.set_ylabel(ch)
+            self.axes_wfm[ch] = ax
+            self.lines_wfm[ch] = line
+
+        axes_wfm[-1].set_xlabel("Time [ns]")
+
+        self.fig_wfm.suptitle("H2Laser Waveform Monitor")
+
         # stop loop when close the GUI
         def on_close(event):
             self.running = False
         self.fig.canvas.mpl_connect("close_event", on_close)
+        self.fig_wfm.canvas.mpl_connect("close_event", on_close)
 
     def run(self):
         self.running = True
@@ -65,6 +84,8 @@ class H2MonitorApp:
                     ch = item["channel_name"]       
                     ts = item["timestamp"]
                     val = item["value"]
+                    self.wvm_t = item["wvm_t"]
+                    self.wvm = item["wvm"]
 
                     if ch not in self.channels:
                         continue
@@ -85,9 +106,17 @@ class H2MonitorApp:
                     ax.relim()
                     ax.autoscale_view()
 
+                    line_wfm = self.lines_wfm[ch]
+                    ax_wfm = self.axes_wfm[ch]
+                    line_wfm.set_data(self.wfm_t, self.wfm)
+                    ax_wfm.relim()
+                    ax_wfm.autoscale_view()
+
                 if any_data:
                     self.fig.canvas.draw()
                     self.fig.canvas.flush_events()
+                    self.fig_wfm.canvas.draw()
+                    self.fig_wfm.canvas.flush_events()
 
                 time.sleep(0.1)   
         except KeyboardInterrupt:

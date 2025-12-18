@@ -51,6 +51,7 @@ class H2LaserDigitizer(threading.Thread):
 
         if self.run_mode == "continuous":
             self.peak_area_buffer = {ch : 0 for ch in self.channels}
+            self.avg_wave_buffer = {ch: np.zeros(self.sample_number) for ch in self.channels}
 
         if self.run_mode == "snapshot":
             self.snapshot_channel = config.get("snapshot_channel")
@@ -111,6 +112,7 @@ class H2LaserDigitizer(threading.Thread):
                 if (self.run_mode == "continuous"):
                     for ch_idx in self.channels:
                         self.peak_area_buffer[ch_idx] += np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t / 100
+                        self.avg_wave_buffer[ch_idx] += wave[f"Ch{ch_idx}"] / 100
                     
                     if (trigger_cnt % 100 == 0):
                         csv_row = {}
@@ -118,13 +120,18 @@ class H2LaserDigitizer(threading.Thread):
                         for ch_idx in self.channels:
                             csv_row[ch_idx] = self.peak_area_buffer[ch_idx]
                             # Send latest value to monitor
-                            self.update_queue.put({
+                            queue_dic = {
                                 "channel_name": self.channel_name[ch_idx],
                                 "timestamp": csv_row['timestamp'],
-                                "value": csv_row[ch_idx]
-                            })
+                                "value": csv_row[ch_idx],
+                                "wvm_t": self.t,
+                                "wvm": self.peak_area_buffer[ch_idx].copy()
+                            }
+                        
+                        self.update_queue.put(queue_dic)
+
                         for ch_idx in self.channels:
-                            self.peak_area_buffer[ch_idx] = 0
+                            self.avg_wave_buffer[ch_idx].fill(0)
                         
                         self.csv_writer.writerow(csv_row)
                         self.csv_pointer.flush()
@@ -132,7 +139,7 @@ class H2LaserDigitizer(threading.Thread):
                 if (self.run_mode == "snapshot"):
                     self.peak_area_buffer.append(np.sum(wave[f"Ch{self.snapshot_channel}"]) * self.delta_t)
                     for ch_idx in self.channels:
-                        self.avg_wave_buffer[ch_idx] += wave[f"Ch{self.snapshot_channel}"] / self.refresh_trigger_cnt
+                        self.avg_wave_buffer[ch_idx] += wave[f"Ch{ch_idx}"] / self.refresh_trigger_cnt
                     if (trigger_cnt % self.refresh_trigger_cnt == 0):    # Reflesh the plot, show the average peak area during last refresh period
                         area_avg = np.mean(self.peak_area_buffer)
                         area_std = np.std(self.peak_area_buffer)
