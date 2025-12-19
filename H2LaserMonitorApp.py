@@ -32,7 +32,7 @@ class H2MonitorApp:
 
         for ax, ch in zip(axes, channels):
             line, = ax.plot([], [], marker=",", linestyle="-")
-            ax.set_ylabel(fr"{ch} integrated area [mV$\times$ns]")
+            ax.set_ylabel(f"{ch} integrated area")
             self.axes[ch] = ax
             self.lines[ch] = line
 
