@@ -89,7 +89,7 @@ class H2LaserDigitizer(threading.Thread):
                     print(f"[I/O] Data saved to CSV file {csv_fullpath}. File closed")
                 self.csv_pointer = open(csv_fullpath, "a", newline="")
                 print(f"[I/O] Opening CSV file {csv_fullpath}")
-                self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+list(self.channel_name.values))
+                self.csv_writer = csv.DictWriter(self.csv_pointer, fieldnames=["timestamp"]+list(self.channel_name.values()))
                 if not file_exists: # Create new file
                     self.csv_writer.writeheader()
                 date_past = date
