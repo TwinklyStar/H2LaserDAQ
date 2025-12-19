@@ -61,6 +61,7 @@ class H2MonitorApp:
 
         axes_wfm[-1].set_xlabel("Time [ns]")
 
+        self.fig_wfm.tight_layout()
         self.fig_wfm.suptitle("H2Laser Waveform Monitor")
 
         self.running = False
