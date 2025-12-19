@@ -44,7 +44,7 @@ class H2MonitorApp:
         self.fig.autofmt_xdate()
         # self.fig.tight_layout()
         self.fig.suptitle(r"H2Laser DAQ Monitor (mV$\times$ns)")
-        self.fig.subplots_adjust(bottom=0.2)
+        self.fig.subplots_adjust(bottom=0.28)
 
 
         self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
