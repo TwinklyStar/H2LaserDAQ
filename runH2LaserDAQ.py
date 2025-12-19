@@ -9,7 +9,7 @@ from H2Exceptions import DigitizerInitError
 def main():
 
     print("==============================================")
-    print("          H2Laser DAQ System  (v1.0)")
+    print("          H2Laser DAQ System  (v2.0)")
     print("          Developer: Meng Lyu @ Dec. 2025")
     print("          Start time:", datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
     print("==============================================\n")

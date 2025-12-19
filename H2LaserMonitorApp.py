@@ -31,8 +31,8 @@ class H2MonitorApp:
         self.lines = {}
 
         for ax, ch in zip(axes, channels):
-            line, = ax.plot([], [], marker=".", linestyle="-")
-            ax.set_ylabel(ch)
+            line, = ax.plot([], [], marker=",", linestyle="-")
+            ax.set_ylabel(fr"{ch} integrated area [mV$\times$ns]")
             self.axes[ch] = ax
             self.lines[ch] = line
 
@@ -42,7 +42,7 @@ class H2MonitorApp:
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
 
         self.fig.autofmt_xdate()
-        self.fig.suptitle("H2Laser DAQ Monitor")
+        self.fig.suptitle(r"H2Laser DAQ Monitor (mV$\times$ns)")
 
 
         self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
@@ -54,8 +54,8 @@ class H2MonitorApp:
         self.lines_wfm = {}
 
         for ax, ch in zip(axes_wfm, channels):
-            line_wfm, = ax.plot([], [], marker=".", linestyle="-")
-            ax.set_ylabel(ch)
+            line_wfm, = ax.plot([], [], marker=",", linestyle="-")
+            ax.set_ylabel("f{ch} [mV]")
             self.axes_wfm[ch] = ax
             self.lines_wfm[ch] = line_wfm
 

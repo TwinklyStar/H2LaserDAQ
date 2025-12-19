@@ -119,7 +119,7 @@ class H2LaserDigitizer(threading.Thread):
                         csv_row = {}
                         csv_row['timestamp'] = time.time()
                         for ch_idx in self.channels:
-                            csv_row[ch_idx] = self.peak_area_buffer[ch_idx]
+                            csv_row[self.channel_name[ch_idx]] = self.peak_area_buffer[ch_idx]
                             # Send latest value to monitor
                             queue_dic = {
                                 "channel_name": self.channel_name[ch_idx],
@@ -164,7 +164,7 @@ class H2LaserDigitizer(threading.Thread):
 
                 if (trigger_cnt % 1000 == 0):
                     time_elapsed = time.time()-time_start
-                    print(f'[DAQ] Health: {datetime.now().strftime("%y-%m-%d %H:%M:%S")} Trigger rate {1000 / time_elapsed} Hz')
+                    print(f'[DAQ] Health: {datetime.now().strftime("%y-%m-%d %H:%M:%S")} Trigger rate {1000 / time_elapsed:.2f} Hz')
                     time_start = time.time()
 
             self.root_pointer.close()
@@ -321,7 +321,7 @@ class H2LaserDigitizer(threading.Thread):
         except:
             raise DigitizerInitError(f"[ERROR] Incorrect timebase {self.timebase}")
 
-        print(f"\tSample interval: {timeIntervalns} ns")
+        print(f"\tSample interval: {timeIntervalns.value} ns")
 
         # Creates a overlow location for data
         overflow = ctypes.c_int16()
@@ -456,7 +456,7 @@ class H2LaserDigitizer(threading.Thread):
         except:
             raise DigitizerInitError(f"[ERROR] Incorrect timebase {self.timebase}")
 
-        print(f"\tSample interval: {timeInterval} ns")
+        print(f"\tSample interval: {timeInterval.value} ns")
 
         # Creates converted types maxsamples
         self.cmaxSamples = ctypes.c_int32(maxsamples)
