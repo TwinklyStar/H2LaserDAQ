@@ -42,7 +42,7 @@ class H2MonitorApp:
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
 
         self.fig.autofmt_xdate()
-        self.fig_wfm.tight_layout()
+        self.fig.tight_layout()
         self.fig.suptitle(r"H2Laser DAQ Monitor (mV$\times$ns)")
 
 
