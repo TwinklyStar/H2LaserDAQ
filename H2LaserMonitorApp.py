@@ -57,7 +57,7 @@ class H2MonitorApp:
 
         for ax, ch in zip(axes_wfm, channels):
             line_wfm, = ax.plot([], [], marker=",", linestyle="-")
-            ax.set_ylabel("f{ch} [mV]")
+            ax.set_ylabel(f"{ch} [mV]")
             self.axes_wfm[ch] = ax
             self.lines_wfm[ch] = line_wfm
 
