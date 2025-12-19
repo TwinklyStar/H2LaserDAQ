@@ -36,7 +36,7 @@ class H2MonitorApp:
             self.axes[ch] = ax
             self.lines[ch] = line
 
-        axes[-1].set_xlabel("Time")
+        axes[-1].set_xlabel("")
         for ax in axes:
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d %H:%M:%S'))
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -44,6 +44,7 @@ class H2MonitorApp:
         self.fig.autofmt_xdate()
         # self.fig.tight_layout()
         self.fig.suptitle(r"H2Laser DAQ Monitor (mV$\times$ns)")
+        self.fig.subplots_adjust(bottom=0.2)
 
 
         self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
@@ -63,6 +64,7 @@ class H2MonitorApp:
         axes_wfm[-1].set_xlabel("Time [ns]")
 
         self.fig_wfm.suptitle("H2Laser Waveform Monitor")
+        self.fig_wfm.subplots_adjust(bottom=0.2)
 
         self.running = False
 
