@@ -23,7 +23,7 @@ class H2MonitorApp:
         plt.ion()
         n = len(self.channels)
         self.fig, axes = plt.subplots(n, 1, sharex=True,
-                                      figsize=(10, 3 * n))
+                                      figsize=(12, 3 * n))
         if n == 1:
             axes = [axes]
 
@@ -42,12 +42,12 @@ class H2MonitorApp:
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
 
         self.fig.autofmt_xdate()
-        self.fig.tight_layout()
+        # self.fig.tight_layout()
         self.fig.suptitle(r"H2Laser DAQ Monitor (mV$\times$ns)")
 
 
         self.fig_wfm, axes_wfm = plt.subplots(n, 1, sharex=True,
-                                      figsize=(10, 3 * n))
+                                      figsize=(12, 3 * n))
         if n == 1:
             axes_wfm = [axes_wfm]
 
