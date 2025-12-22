@@ -27,7 +27,7 @@ def main():
         if "timestamp" not in df.columns and channel_name not in df.columns:
             raise RuntimeError(f"{path}: missing required column")
         t.extend(pd.to_datetime(df.loc[df['timestamp'] < end_time_stamp, 'timestamp'], unit='s'))
-        val.extend(df[df['timestamp'] < end_time_stamp, channel_name].to_numpy())
+        val.extend(df.loc[df['timestamp'] < end_time_stamp, channel_name].to_numpy())
 
         time_itr = time_itr + timedelta(days=1)
     
