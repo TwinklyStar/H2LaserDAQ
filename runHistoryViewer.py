@@ -2,6 +2,7 @@ from config_history import HISTORY_CONFIG
 import os
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
@@ -11,6 +12,7 @@ def main():
         end_time = datetime.strptime(HISTORY_CONFIG.get("end_time"), "%Y-%m-%d %H:%M:%S")
     except ValueError:
         raise
+    end_time_stamp = end_time.timestamp()
     channel_name = HISTORY_CONFIG.get("channel_name")
     run_name = HISTORY_CONFIG.get("run_name")
     time_itr = start_time
@@ -24,8 +26,8 @@ def main():
         df = pd.read_csv(path)
         if "timestamp" not in df.columns and channel_name not in df.columns:
             raise RuntimeError(f"{path}: missing required column")
-        t.extend(pd.to_datetime(df['timestamp'], unit='s'))
-        val.extend(df[channel_name].to_numpy())
+        t.extend(pd.to_datetime(df.loc['timestamp' < end_time_stamp, 'timestamp'], unit='s'))
+        val.extend(df['timestamp' < end_time_stamp, channel_name].to_numpy())
 
         time_itr = time_itr + timedelta(days=1)
     
