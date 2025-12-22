@@ -17,12 +17,13 @@ def main():
     end_time_stamp = end_time.timestamp()
     channel_name = HISTORY_CONFIG.get("channel_name")
     run_name = HISTORY_CONFIG.get("run_name")
+    data_path = HISTORY_CONFIG.get("data_path")
     time_itr = start_time
     t = []
     val = []
     while time_itr.date() <= end_time.date():
         try:
-            path = f'data/csv/{run_name}_{time_itr.strftime("%y%m%d")}.csv'
+            path = f'{data_path}{run_name}_{time_itr.strftime("%y%m%d")}.csv'
         except FileNotFoundError:
             raise
         df = pd.read_csv(path)
