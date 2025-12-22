@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+from zoneinfo import ZoneInfo
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
@@ -12,6 +13,7 @@ def main():
         end_time = datetime.strptime(HISTORY_CONFIG.get("end_time"), "%Y-%m-%d %H:%M:%S")
     except ValueError:
         raise
+    start_time_stamp = start_time.timestamp()
     end_time_stamp = end_time.timestamp()
     channel_name = HISTORY_CONFIG.get("channel_name")
     run_name = HISTORY_CONFIG.get("run_name")
@@ -26,18 +28,21 @@ def main():
         df = pd.read_csv(path)
         if "timestamp" not in df.columns and channel_name not in df.columns:
             raise RuntimeError(f"{path}: missing required column")
-        t.extend(pd.to_datetime(df.loc[df['timestamp'] < end_time_stamp, 'timestamp'], unit='s'))
-        val.extend(df.loc[df['timestamp'] < end_time_stamp, channel_name].to_numpy())
+        df["time"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
+        df["time"] = df["time"].dt.tz_convert("Asia/Tokyo")
+
+        t.extend(df.loc[(df['timestamp'] > start_time_stamp) & (df['timestamp'] < end_time_stamp), "time"].to_list())
+        val.extend(df.loc[(df['timestamp'] > start_time_stamp) & (df['timestamp'] < end_time_stamp), channel_name].to_numpy())
 
         time_itr = time_itr + timedelta(days=1)
     
     fig, ax = plt.subplots(figsize=(10,4))
 
     ax.plot(t, val)
-    ax.set_xlabel("Time")
+    ax.set_xlabel("Time [JST]")
     ax.set_ylabel(r"Integrated area [mV$\times$ns]")
     ax.set_title(channel_name)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d %H:%M:%S'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d %H:%M:%S', tz=ZoneInfo("Asia/Tokyo")))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     fig.autofmt_xdate()
     fig.tight_layout()
