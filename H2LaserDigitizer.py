@@ -129,7 +129,7 @@ class H2LaserDigitizer(threading.Thread):
                                 "wfm": self.avg_wave_buffer[ch_idx].copy()
                             }
                         
-                        self.update_queue.put(queue_dic)
+                            self.update_queue.put(queue_dic)
 
                         for ch_idx in self.channels:
                             self.avg_wave_buffer[ch_idx].fill(0)

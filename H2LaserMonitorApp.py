@@ -97,6 +97,7 @@ class H2MonitorApp:
                     dt = datetime.fromtimestamp(ts)
                     self.times[ch].append(dt)
                     self.values[ch].append(val)
+                    self.lines_wfm[ch].set_data(self.wfm_t, self.wfm)
 
                 any_data = False
                 for ch in self.channels:
@@ -110,9 +111,7 @@ class H2MonitorApp:
                     ax.relim()
                     ax.autoscale_view()
 
-                    line_wfm = self.lines_wfm[ch]
                     ax_wfm = self.axes_wfm[ch]
-                    line_wfm.set_data(self.wfm_t, self.wfm)
                     ax_wfm.relim()
                     ax_wfm.autoscale_view()
 
