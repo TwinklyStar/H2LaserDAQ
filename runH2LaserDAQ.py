@@ -1,10 +1,10 @@
 # runH2LaserDAQ.py
-from config import DIGITIZER_CONFIGS
-from H2LaserDAQManager import H2LaserDAQManager
-from H2LaserMonitorApp import H2MonitorApp
+from config.config import DIGITIZER_CONFIGS
+from src.H2LaserDAQManager import H2LaserDAQManager
+from src.H2LaserMonitorApp import H2MonitorApp
 import time
 from datetime import datetime
-from H2Exceptions import DigitizerInitError
+from src.H2Exceptions import DigitizerInitError
 
 def main():
 

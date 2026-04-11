@@ -1,9 +1,9 @@
 # h2_manager.py
 import queue
 import threading
-from H2Exceptions import DigitizerInitError
-from utility import log
-from H2LaserDigitizer import H2LaserDigitizer
+from .H2Exceptions import DigitizerInitError
+from .utility import log
+from .H2LaserDigitizer import H2LaserDigitizer
 
 class H2LaserDAQManager:
     def __init__(self, digitizer_configs):

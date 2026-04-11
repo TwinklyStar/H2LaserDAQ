@@ -1,4 +1,4 @@
-from config_history import HISTORY_CONFIG
+from config.config_history import HISTORY_CONFIG
 import os
 from datetime import datetime, timedelta
 import pandas as pd

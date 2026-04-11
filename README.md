@@ -42,13 +42,15 @@ No `requirements.txt` is provided. Install the following manually:
 |---------|---------|
 | `picosdk` | PicoScope hardware SDK Python bindings |
 | `numpy` | Vectorized ADC conversion and waveform processing |
-| `matplotlib` | Real-time GUI |
+| `pyqtgraph` | Real-time DAQ monitor GUI |
+| `PyQt5` | Qt backend for pyqtgraph |
 | `uproot` | CERN ROOT file I/O (write) |
 | `awkward` | Variable-length array support for uproot |
 | `pandas` | CSV reading in the history viewer |
+| `matplotlib` | History viewer plots only |
 
 ```bash
-pip install picosdk numpy matplotlib uproot awkward pandas
+pip install picosdk numpy pyqtgraph PyQt5 uproot awkward pandas matplotlib
 ```
 
 The PicoScope SDK also requires the native PicoSDK drivers to be installed on the host machine. Download from [Pico Technology](https://www.picotech.com/downloads).
@@ -86,18 +88,27 @@ H2LaserDAQ/
 ├── ps3000Snapshot.py       # PS3000 snapshot test/demo
 ├── runHistoryViewer.py     # Offline historical CSV data viewer
 │
-├── H2LaserDAQManager.py    # Thread coordinator: spawns and joins digitizer threads
-├── H2LaserDigitizer.py     # Core worker thread — one instance per PicoScope device
-├── H2LaserMonitorApp.py    # Real-time matplotlib GUI
-├── picoDAQAssistant.py     # Utility: RootManager, NumpyRingQueue, ADC converters
-├── H2Exceptions.py         # Custom exception: DigitizerInitError
-├── utility.py              # Logging helper
+├── src/                    # Library package
+│   ├── H2LaserDAQManager.py    # Thread coordinator: spawns and joins digitizer threads
+│   ├── H2LaserDigitizer.py     # Core worker thread — one instance per PicoScope device
+│   ├── H2LaserMonitorApp.py    # Real-time matplotlib GUI
+│   ├── picoDAQAssistant.py     # Utility: RootManager, NumpyRingQueue, ADC converters
+│   ├── H2Exceptions.py         # Custom exception: DigitizerInitError
+│   └── utility.py              # Logging helper
 │
-├── config.py               # Default config: DET10A2 (PS3405D) + NOCell (PS2204A)
-├── config_H2PD.py          # Config for H2 photodiode snapshot run
-├── config_LaserRoomPD.py   # Config for laser room PD monitoring
-├── config_ps3000Snapshot.py # Config for PS3000 snapshot test
-├── config_history.py       # Config for history viewer
+├── config/                 # Configuration package
+│   ├── config.py               # Default config: DET10A2 (PS3405D) + NOCell (PS2204A)
+│   ├── config_H2PD.py          # Config for H2 photodiode snapshot run
+│   ├── config_LaserRoomPD.py   # Config for laser room PD monitoring
+│   ├── config_ps3000Snapshot.py # Config for PS3000 snapshot test
+│   └── config_history.py       # Config for history viewer
+│
+├── test/                   # Hardware-free virtual tests
+│   ├── VirtualDigitizer.py         # Drop-in mock: generates synthetic waveforms at 25 Hz
+│   ├── config_virtual_continuous.py
+│   ├── config_virtual_snapshot.py
+│   ├── runVirtualContinuous.py     # Virtual continuous-mode test with full GUI
+│   └── runVirtualSnapshot.py       # Virtual snapshot-mode test with full GUI
 │
 └── data/
     ├── root/               # ROOT files (daily, up to 10,000 triggers/file)
@@ -114,7 +125,7 @@ H2LaserDAQ/
 python3 runH2LaserDAQ.py
 ```
 
-Reads `config.py` (`DIGITIZER_CONFIGS`). Starts one acquisition thread per configured digitizer and opens two matplotlib windows:
+Reads `config/config.py` (`DIGITIZER_CONFIGS`). Starts one acquisition thread per configured digitizer and opens two matplotlib windows:
 
 - **Signal monitor** — time-series of integrated peak area per channel (mV×ns)
 - **Waveform monitor** — averaged raw waveform per channel (mV vs. ns)
@@ -160,6 +171,30 @@ python3 runHistoryViewer.py
 ```
 
 Reads from `config_history.py`. Plots a selected channel from CSV files over a date range. Configure before running — see [Viewing Historical Data](#viewing-historical-data).
+
+---
+
+### Virtual Tests (no hardware required)
+
+The `test/` folder contains two programs that exercise the full DAQ pipeline — ROOT write, CSV write, and real-time GUI — without a connected PicoScope. A synthetic **500 mV / 1 µs square pulse** is generated at **25 Hz** in software.
+
+**Continuous mode:**
+
+```bash
+python3 test/runVirtualContinuous.py
+```
+
+Opens the same two-window `H2MonitorApp` GUI as the real DAQ. Data is aggregated over 100 triggers (~4 s) and written to `data/csv/` and `data/root/`. Integrated area per channel should read approximately **500 mV × 1000 ns = 5 × 10⁵ mV·ns**.
+
+**Snapshot mode:**
+
+```bash
+python3 test/runVirtualSnapshot.py
+```
+
+Averages 100 waveforms per refresh and displays the averaged pulse shape plus peak-area statistics in a single matplotlib window. Data is written to `data/root/` only.
+
+Both tests must be run from the **project root directory** and require the x86 virtualenv to be active (for `uproot`/`awkward`).
 
 ---
 
