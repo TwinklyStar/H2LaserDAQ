@@ -1,5 +1,6 @@
 # H2LaserDigitizer.py
 import threading
+import traceback
 import ctypes
 import numpy as np
 import time
@@ -39,6 +40,7 @@ class H2LaserDigitizer(threading.Thread):
 
         self.csv_pointer  = None
         self.root_pointer = None
+        self.error        = None   # set if run() exits due to an exception
 
         try:
             self._init_hardware(config)
@@ -109,6 +111,29 @@ class H2LaserDigitizer(threading.Thread):
     # -------------------------------------------------------------------------
 
     def run(self):
+        try:
+            self._run_loop()
+        except Exception as e:
+            self.error = e
+            log(f"[ERROR] Thread '{self.name}' crashed: {e}")
+            log(traceback.format_exc().strip())
+            # Signal all other threads to stop.
+            self.stop_event.set()
+            # Notify the GUI so the status bar turns red immediately.
+            self.update_queue.put({
+                "type":    "error",
+                "source":  self.name,
+                "message": f"{self.name}: {e}",
+            })
+            # Best-effort: close the open ROOT file so data isn't lost.
+            try:
+                if self.root_pointer is not None:
+                    self.root_pointer.close()
+                    log(f"[I/O] ROOT file closed after error.")
+            except Exception:
+                pass
+
+    def _run_loop(self):
         date_past = ""
         while not self.stop_event.is_set():
             date = datetime.today().strftime("%y%m%d")
@@ -625,4 +650,5 @@ class H2LaserDigitizer(threading.Thread):
             self.bufferMax["B"].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
             None, None, ctypes.byref(oversample), self.cmaxSamples,
         )
-        assert_pico2000_ok(self.status["getValues"])
+        if not self.stop_event.is_set():
+            assert_pico2000_ok(self.status["getValues"])

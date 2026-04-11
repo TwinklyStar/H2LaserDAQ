@@ -8,7 +8,11 @@ def main():
     print_banner("Laser Room VUV Photodiode  (snapshot mode)")
 
     cfg = next(iter(DIGITIZER_CONFIGS.values()))
-    daq_manager = H2LaserDAQManager(DIGITIZER_CONFIGS)
+    try:
+        daq_manager = H2LaserDAQManager(DIGITIZER_CONFIGS)
+    except SystemExit:
+        print("[FATAL] DAQ could not start. Program terminated.")
+        return
 
     monitor = H2SnapshotApp(
         channels=cfg["channels"],

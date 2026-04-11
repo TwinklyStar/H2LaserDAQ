@@ -1,4 +1,4 @@
-# h2_manager.py
+# H2LaserDAQManager.py
 import queue
 import threading
 from .H2Exceptions import DigitizerInitError
@@ -37,9 +37,16 @@ class H2LaserDAQManager:
 
     def stop_all(self):
         self.stop_event.set()
-        print("[EXIT] Stopping DAQ threads...")
+        log("[EXIT] Stopping DAQ threads...")
+        _JOIN_TIMEOUT = 10.0   # seconds to wait before declaring a thread stuck
         for w in self.workers.values():
-            print(f"[EXIT] Stopping digitizer {w.model} {w.serial}")
-            w.join()
-            w.close()
-        print("[EXIT] All digitizer stopped")
+            log(f"[EXIT] Joining thread '{w.name}' ...")
+            w.join(timeout=_JOIN_TIMEOUT)
+            if w.is_alive():
+                log(f"[WARN] Thread '{w.name}' did not stop within "
+                    f"{_JOIN_TIMEOUT:.0f} s — skipping close()")
+            else:
+                w.close()
+                if w.error is not None:
+                    log(f"[WARN] Thread '{w.name}' exited with error: {w.error}")
+        log("[EXIT] All DAQ threads stopped.")

@@ -327,6 +327,10 @@ class _MonitorWindow(QtWidgets.QMainWindow):
             except queue.Empty:
                 break
 
+            if item.get("type") == "error":
+                self._show_error(item.get("message", "Unknown error"))
+                continue
+
             ch = item.get("channel_name")
             if ch not in self.channels:
                 continue
@@ -350,6 +354,13 @@ class _MonitorWindow(QtWidgets.QMainWindow):
             self._lbl_time.setText(
                 f"  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}"
             )
+
+    def _show_error(self, message: str):
+        self._lbl_time.setText(f"  ⚠  {message}")
+        self._lbl_time.setStyleSheet(
+            f"color: #f38ba8; font-weight: bold;"   # Catppuccin red
+        )
+        self._lbl_time.setFixedWidth(600)
 
     # ── window close ─────────────────────────────────────────────────────────
 
@@ -541,12 +552,17 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
 
     def _poll(self):
         item = None
-        # drain queue, keep only the latest packet
+        # drain queue, keep only the latest data packet;
+        # handle error sentinels immediately as they arrive.
         while True:
             try:
-                item = self.update_queue.get_nowait()
+                candidate = self.update_queue.get_nowait()
             except queue.Empty:
                 break
+            if candidate.get("type") == "error":
+                self._show_error(candidate.get("message", "Unknown error"))
+                continue
+            item = candidate
 
         if item is None:
             return
@@ -574,6 +590,12 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         self._lbl_n.setText(f"  N = {n} triggers")
         self._lbl_time.setText(
             f"  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}  "
+        )
+
+    def _show_error(self, message: str):
+        self._lbl_time.setText(f"  ⚠  {message}")
+        self._lbl_time.setStyleSheet(
+            f"color: #f38ba8; font-weight: bold;"   # Catppuccin red
         )
 
     # ── window close ─────────────────────────────────────────────────────────
