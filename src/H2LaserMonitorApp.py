@@ -50,6 +50,41 @@ def _colour(i: int) -> str:
     return _CH_COLOURS[i % len(_CH_COLOURS)]
 
 
+# ---------------------------------------------------------------------------
+# Custom ViewBox: left-click = rect zoom, right-click drag = pan
+# ---------------------------------------------------------------------------
+
+class _ZoomPanViewBox(pg.ViewBox):
+    """
+    ViewBox with scientific-instrument mouse bindings:
+      • Left-click drag  → rubber-band rect zoom
+      • Right-click drag → pan
+      • Scroll wheel     → zoom on the axis under cursor
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMouseMode(pg.ViewBox.RectMode)
+
+    def mouseDragEvent(self, ev, axis=None):
+        if ev.button() == QtCore.Qt.RightButton:
+            ev.accept()
+            # Replicate pyqtgraph's internal pan logic (same as left-click in
+            # PanMode) so the right-click drag pans the view.
+            dif  = pg.Point(ev.screenPos() - ev.lastScreenPos())
+            mask = np.array(self.state["mouseEnabled"], dtype=float)
+            tr   = pg.functions.invertQTransform(self.childGroup.transform())
+            tr   = tr.map(dif * mask) - tr.map(pg.Point(0, 0))
+            x    = -tr.x() if mask[0] else None
+            y    = -tr.y() if mask[1] else None
+            self._resetTarget()
+            if x is not None or y is not None:
+                self.translateBy(x=x, y=y)
+            self.sigRangeChangedManually.emit(self.state["mouseEnabled"])
+        else:
+            super().mouseDragEvent(ev, axis)
+
+
 def _setup_sigint(window: QtWidgets.QMainWindow):
     """
     Allow Ctrl+C to close a Qt window cleanly.
@@ -191,7 +226,8 @@ class _MonitorWindow(QtWidgets.QMainWindow):
         for i, ch in enumerate(self.channels):
             col       = _colour(i)
             date_axis = pg.DateAxisItem(orientation="bottom")
-            p = gw.addPlot(row=i, col=0, axisItems={"bottom": date_axis})
+            p = gw.addPlot(row=i, col=0, axisItems={"bottom": date_axis},
+                           viewBox=_ZoomPanViewBox())
             p.setLabel("left", ch, units="mV·ns", color=col, size="10pt")
             # Compound unit — disable SI prefix to prevent "kmV·ns" etc.
             p.getAxis("left").enableAutoSIPrefix(False)
@@ -217,7 +253,7 @@ class _MonitorWindow(QtWidgets.QMainWindow):
 
         for i, ch in enumerate(self.channels):
             col = _colour(i)
-            p = gw.addPlot(row=i, col=0)
+            p = gw.addPlot(row=i, col=0, viewBox=_ZoomPanViewBox())
             # Use base SI units so pyqtgraph auto-scales to mV, µs, etc.
             p.setLabel("left", ch, units="V", color=col, size="10pt")
             p.showGrid(x=True, y=True, alpha=0.20)
@@ -447,7 +483,7 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         for i, (ch, label) in enumerate(zip(self.channels,
                                              self.channel_labels)):
             col = _colour(i)
-            p = gw.addPlot(row=i, col=0)
+            p = gw.addPlot(row=i, col=0, viewBox=_ZoomPanViewBox())
             # Use base SI units so pyqtgraph auto-scales to mV, µs, etc.
             p.setLabel("left", label, units="V", color=col, size="10pt")
             p.showGrid(x=True, y=True, alpha=0.20)
