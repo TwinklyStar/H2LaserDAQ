@@ -1,14 +1,11 @@
 from config.config_LaserRoomPD import DIGITIZER_CONFIGS
 from src.H2LaserDAQManager import H2LaserDAQManager
 from src.H2LaserMonitorApp import H2SnapshotApp
-from datetime import datetime
+from src.banner import print_banner, print_footer
 
 
 def main():
-    print("==============================================")
-    print("     Laser Room VUV Photodiode Snapshot")
-    print("     Start time:", datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
-    print("==============================================\n")
+    print_banner("Laser Room VUV Photodiode  (snapshot mode)")
 
     cfg = next(iter(DIGITIZER_CONFIGS.values()))
     daq_manager = H2LaserDAQManager(DIGITIZER_CONFIGS)
@@ -26,9 +23,7 @@ def main():
         monitor.run()
     finally:
         daq_manager.stop_all()
-        print("\n==============================================")
-        print("     Laser Room Photodiode ended normally.")
-        print("==============================================")
+        print_footer("Laser Room VUV Photodiode")
 
 
 if __name__ == "__main__":

@@ -2,17 +2,12 @@
 from config.config import DIGITIZER_CONFIGS
 from src.H2LaserDAQManager import H2LaserDAQManager
 from src.H2LaserMonitorApp import H2MonitorApp
-import time
-from datetime import datetime
+from src.banner import print_banner, print_footer
 from src.H2Exceptions import DigitizerInitError
 
 def main():
 
-    print("==============================================")
-    print("          H2Laser DAQ System  (v2.0)")
-    print("          Developer: Meng Lyu @ Dec. 2025")
-    print("          Start time:", datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
-    print("==============================================\n")
+    print_banner("H2 Laser Room DAQ  (continuous mode)")
     # Pass macro configs into the classes
     try:
         daq_manager = H2LaserDAQManager(DIGITIZER_CONFIGS)
@@ -33,9 +28,7 @@ def main():
         # On exit (or error), stop all digitizer threads cleanly
         daq_manager.stop_all()
 
-        print("\n==============================================")
-        print("        H2Laser DAQ ended normally.")
-        print("==============================================")
+        print_footer("H2 Laser Room DAQ")
 
 if __name__ == "__main__":
     main()
