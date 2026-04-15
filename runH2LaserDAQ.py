@@ -14,7 +14,16 @@ def main():
     except SystemExit:
         print("[FATAL] DAQ could not start. Program terminated.")
         return
-    monitor = H2MonitorApp(channels = ["355", "212", "820", "NO_cell"], update_queue=daq_manager.update_queue)
+    displayed = ["355", "212", "820", "NO_cell"]
+    channel_groups = [
+        [name for name in cfg["channel_name"] if name in displayed]
+        for cfg in DIGITIZER_CONFIGS.values()
+    ]
+    monitor = H2MonitorApp(
+        channels=displayed,
+        update_queue=daq_manager.update_queue,
+        channel_groups=channel_groups,
+    )
 
     daq_manager.start_all()
 

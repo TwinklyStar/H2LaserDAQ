@@ -198,8 +198,8 @@ class H2LaserDigitizer(threading.Thread):
                 if self.run_mode == "continuous":
                     for ch_idx in self.channels:
                         self.peak_area_buffer[ch_idx] += (
-                            np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t / 100
-                        )
+                            np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t / 100 * 1e-3
+                        )   # mV·ns → nV·s
                         self.avg_wave_buffer[ch_idx] += (
                             wave[f"Ch{ch_idx}"] / 100
                         )
@@ -227,8 +227,8 @@ class H2LaserDigitizer(threading.Thread):
                 elif self.run_mode == "snapshot":
                     self.peak_area_buffer.append(
                         np.sum(wave[f"Ch{self.snapshot_channel}"])
-                        * self.delta_t
-                    )
+                        * self.delta_t * 1e-3
+                    )   # mV·ns → nV·s
                     for ch_idx in self.channels:
                         self.avg_wave_buffer[ch_idx] += (
                             wave[f"Ch{ch_idx}"] / self.refresh_trigger_cnt

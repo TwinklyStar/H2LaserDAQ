@@ -19,6 +19,7 @@ def main():
         channel_labels=cfg["channel_name"],
         update_queue=daq_manager.update_queue,
         title="Laser Room VUV Photodiode",
+        signal_channel=cfg.get("snapshot_channel", cfg["channels"][0]),
     )
 
     daq_manager.start_all()

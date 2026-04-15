@@ -45,7 +45,7 @@ class VirtualDigitizer(H2LaserDigitizer):
     """
 
     TRIGGER_RATE_HZ    = 25.0     # simulated acquisition rate
-    PULSE_AMPLITUDE_MV = 500.0    # square pulse height  [mV]
+    PULSE_AMPLITUDE_MV = -700.0    # square pulse height  [mV]
     PULSE_WIDTH_NS     = 1000.0   # square pulse width   [ns]
 
     # -------------------------------------------------------------------------
@@ -99,17 +99,32 @@ class VirtualDigitizer(H2LaserDigitizer):
     # -------------------------------------------------------------------------
 
     def _capture_block(self):
-        """Sleep to enforce 25 Hz, then fill bufferMax with a square pulse."""
+        """Sleep to enforce 25 Hz, then fill bufferMax with a square pulse.
+
+        Per-trigger amplitude and width are drawn from independent Gaussian
+        distributions:
+            amplitude ~ N(PULSE_AMPLITUDE_MV,  (0.05 · |PULSE_AMPLITUDE_MV|)²)
+            width     ~ N(PULSE_WIDTH_NS,       (0.05 · PULSE_WIDTH_NS)²)
+        so the pulse-to-pulse variation has σ = 5 % of the nominal value.
+        """
         time.sleep(1.0 / self.TRIGGER_RATE_HZ)
+
+        amp_sigma   = abs(self.PULSE_AMPLITUDE_MV) * 0.05
+        width_sigma = self.PULSE_WIDTH_NS * 0.05
 
         for ch in self.channels:
             vrange_mv = _CHANNEL_INPUT_RANGES[self.ch_range[ch]]
-            adc_amp   = int(
-                self.PULSE_AMPLITUDE_MV * self.maxADC.value / vrange_mv
-            )
+
+            # Draw random amplitude and width for this trigger
+            amp_mv     = np.random.normal(self.PULSE_AMPLITUDE_MV, amp_sigma)
+            width_ns   = max(self.delta_t,
+                             np.random.normal(self.PULSE_WIDTH_NS, width_sigma))
+            pulse_samp = max(1, int(width_ns / self.delta_t))
+
+            adc_amp = int(amp_mv * self.maxADC.value / vrange_mv)
             buf = np.zeros(self.sample_number, dtype=np.int32)
             start = self._pre_trigger_sample
-            end   = min(start + self._pulse_samples, self.sample_number)
+            end   = min(start + pulse_samp, self.sample_number)
             buf[start:end] = adc_amp
             # Add ±2 ADC-count white noise (~0.12 mV for 2 V range)
             buf += np.random.randint(-2, 3, size=self.sample_number,

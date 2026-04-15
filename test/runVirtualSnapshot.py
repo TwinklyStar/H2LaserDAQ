@@ -40,6 +40,7 @@ def main():
         channel_labels=cfg["channel_name"],
         update_queue=update_queue,
         title="Virtual Snapshot",
+        signal_channel=cfg.get("snapshot_channel", cfg["channels"][0]),
     )
 
     worker.start()
