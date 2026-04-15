@@ -1,3 +1,5 @@
+CONFIG_TITLE = "H2 Laser Room DAQ"
+
 DIGITIZER_CONFIGS = {
     "DET10A2": {
         "run_mode": "continuous",   # continuous or snapshot

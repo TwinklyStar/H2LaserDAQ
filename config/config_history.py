@@ -1,4 +1,6 @@
-HISTORY_CONFIG={
+CONFIG_TITLE = "History — NO Cell (Dec 2025)"
+
+HISTORY_CONFIG = {
     "run_name": "NOCellOnly",
     "channel_name": "NO_cell",
     "data_path": "data/csv/",

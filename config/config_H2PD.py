@@ -1,3 +1,5 @@
+CONFIG_TITLE = "H2 VUV Photodiode"
+
 DIGITIZER_CONFIGS = {
     "H2PD": {
         "run_mode": "snapshot",     # continuous or snapshot

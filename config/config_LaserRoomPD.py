@@ -1,3 +1,5 @@
+CONFIG_TITLE = "Laser Room VUV Photodiode"
+
 DIGITIZER_CONFIGS = {
     "LaserRoomPD": {
         "run_mode": "snapshot",     # continuous or snapshot
