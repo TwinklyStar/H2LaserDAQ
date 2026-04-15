@@ -1,4 +1,4 @@
-CONFIG_TITLE = "H2 Laser Room DAQ"
+CONFIG_TITLE = "H2 Laser Regular DAQ (NO cell + DET10A2 PD)"
 
 DIGITIZER_CONFIGS = {
     "DET10A2": {

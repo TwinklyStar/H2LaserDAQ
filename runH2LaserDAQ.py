@@ -12,6 +12,7 @@
 import glob
 import importlib
 import os
+import re
 import sys
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +95,7 @@ def _discover_configs() -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 from src.banner import (
+    BOX_INNER,
     box_top, box_line, box_bottom, box_divider,
     header_section_lines, vis_len,
     _c, _BOLD, _DIM, _CYAN, _YELLOW, _GREEN,
@@ -102,7 +104,18 @@ from src.banner import (
 _IS_TTY = sys.stdout.isatty() and sys.stdin.isatty()
 _CLEAR  = "\033[2J\033[H"
 
-_COL_LABEL = 32   # visual width reserved for item labels in the menu
+_COL_LABEL  = 32   # visual width reserved for item labels in the menu
+# prefix before detail: "  "(2) + marker(3) + " "(1) + label(32) + "  "(2) = 40
+_MAX_DETAIL = BOX_INNER - 40   # remaining chars available for the detail column
+
+
+def _trunc(s: str, max_vis: int) -> str:
+    """Clip *plain* string s to at most max_vis visual chars, appending … if clipped."""
+    # strip any ANSI codes that may already be embedded
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", s)
+    if len(plain) <= max_vis:
+        return plain
+    return plain[: max_vis - 1] + "…"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +152,10 @@ def _render(section: str, items: list, selected: int) -> None:
             continue
 
         label, detail = entry if isinstance(entry, tuple) else (entry, "")
+
+        # truncate to fit within the box before applying colour
+        label  = _trunc(label,  _COL_LABEL)
+        detail = _trunc(detail, _MAX_DETAIL)
 
         if i == selected:
             marker  = _c(_GREEN + _BOLD, " ❯ ")
