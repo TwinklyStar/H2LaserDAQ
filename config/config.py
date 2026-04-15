@@ -28,9 +28,9 @@ DIGITIZER_CONFIGS = {
         "run_mode": "continuous",   # continuous or snapshot
         "model": "2204A",
         "serial": "12017/0359",
-        "channels": ["A", "B"],
-        "channel_name": ["NO_cell", "NO_cell_trig"],
-        "voltage_range": {"A":"2V", "B":"2V"},      # Check readme
+        "channels": ["A"],
+        "channel_name": ["NO_cell"],
+        "voltage_range": {"A":"2V"},      # Check readme
         "timebase": 8,  # Timebase guide for 2204A: 
                         # 0 : 10ns   <- Only available in 1-channel mode
                         # 1 : 20ns  // half

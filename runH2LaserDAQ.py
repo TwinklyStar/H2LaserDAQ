@@ -90,102 +90,72 @@ def _discover_configs() -> list:
     return results
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ANSI helpers  (same palette as src/banner.py)
+# Shared styling — imported from src/banner.py
 # ─────────────────────────────────────────────────────────────────────────────
 
-_IS_TTY = sys.stdout.isatty() and sys.stdin.isatty()
+from src.banner import (
+    box_top, box_line, box_bottom, box_divider,
+    header_section_lines, vis_len,
+    _c, _BOLD, _DIM, _CYAN, _YELLOW, _GREEN,
+)
 
-_BOLD   = "\033[1m"
-_DIM    = "\033[2m"
-_CYAN   = "\033[96m"
-_YELLOW = "\033[93m"
-_GREEN  = "\033[92m"
-_RESET  = "\033[0m"
+_IS_TTY = sys.stdout.isatty() and sys.stdin.isatty()
 _CLEAR  = "\033[2J\033[H"
 
-_VERSION = "3"
-_AUTHOR  = "Meng Lyu"
-_INST    = "University of Tokyo"
-_YEARS   = "2025-2026"
-_RULE    = "  " + "═" * 62
-
-
-def _c(code: str, text: str) -> str:
-    return f"{code}{text}{_RESET}" if _IS_TTY else text
+_COL_LABEL = 32   # visual width reserved for item labels in the menu
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TUI renderer
 # ─────────────────────────────────────────────────────────────────────────────
 
-_COL_LABEL  = 32   # left column width for menu items
-_COL_DETAIL = 28   # right column width for detail text
-
-
 def _render(section: str, items: list, selected: int) -> None:
     """
-    Render the full screen.
+    Render the full-screen menu inside the shared banner box.
 
     Parameters
     ----------
     section : str
-        Prompt shown above the item list, e.g. "Select a mode:".
-    items : list of (label, detail) or plain str
-        Menu entries.  Use ``None`` as a visual separator (non-selectable).
+        Prompt line shown above the item list.
+    items : list of (label, detail) tuples, plain str, or None (separator).
     selected : int
         Index of the currently highlighted entry.
     """
-    lines = []
+    # ── identity header (shared with print_banner) ────────────────────────────
+    lines = [""] + header_section_lines()
 
-    # ── header ────────────────────────────────────────────────────────────────
-    lines.append("")
-    lines.append(_RULE)
-    lines.append("")
-    lines.append(
-        "    "
-        + _c(_BOLD + _CYAN, "H 2 L a s e r D A Q")
-        + "   ·   "
-        + _c(_YELLOW, f"v{_VERSION}")
-    )
-    lines.append("    " + _c(_DIM, "H2 Laser  ·  Data Acquisition System"))
-    lines.append("    " + _c(_DIM, f"{_AUTHOR}  ·  {_INST}  ·  {_YEARS}"))
-    lines.append("")
-    lines.append(_RULE)
-    lines.append("")
-
-    # ── section prompt ────────────────────────────────────────────────────────
-    lines.append("    " + _c(_BOLD, section))
-    lines.append("")
+    # ── section divider ───────────────────────────────────────────────────────
+    select_label = "  " + _c(_GREEN, "◆  Menu  ◆") + "  "
+    lines.append(box_divider(select_label))
+    lines.append(box_line())
+    lines.append(box_line("    " + _c(_BOLD, section)))
+    lines.append(box_line())
 
     # ── items ─────────────────────────────────────────────────────────────────
     for i, entry in enumerate(items):
-        if entry is None:                          # visual separator
-            lines.append("    " + _c(_DIM, "  ─" * 20))
+        if entry is None:
+            # visual separator — a dim rule inside the box
+            lines.append(box_line("    " + _c(_DIM, "─" * 50)))
             continue
 
-        if isinstance(entry, tuple):
-            label, detail = entry
-        else:
-            label, detail = entry, ""
+        label, detail = entry if isinstance(entry, tuple) else (entry, "")
 
         if i == selected:
-            marker    = _c(_GREEN + _BOLD, " ❯ ")
-            lbl_fmt   = _c(_BOLD + _CYAN, label.ljust(_COL_LABEL))
-            det_fmt   = _c(_DIM, detail)
+            marker  = _c(_GREEN + _BOLD, " ❯ ")
+            lbl_fmt = _c(_BOLD + _CYAN, label) + " " * max(0, _COL_LABEL - vis_len(label))
+            det_fmt = _c(_DIM, detail)
         else:
-            marker    = "   "
-            lbl_fmt   = _c(_DIM, label.ljust(_COL_LABEL))
-            det_fmt   = _c(_DIM, detail)
+            marker  = "   "
+            lbl_fmt = _c(_DIM, label) + " " * max(0, _COL_LABEL - vis_len(label))
+            det_fmt = _c(_DIM, detail)
 
-        lines.append(f"  {marker} {lbl_fmt}  {det_fmt}")
+        lines.append(box_line(f"  {marker} {lbl_fmt}  {det_fmt}"))
 
-    # ── footer hint ───────────────────────────────────────────────────────────
-    lines.append("")
-    lines.append(
-        "    " + _c(_DIM, "↑ / ↓  navigate    Enter  confirm    q  quit")
-    )
-    lines.append("")
-    lines.append(_RULE)
+    # ── nav hint + close ──────────────────────────────────────────────────────
+    lines.append(box_line())
+    lines.append(box_line("    " + _c(_DIM, "↑ / ↓  navigate    Enter  confirm    q  quit")))
+    lines.append(box_line())
+    lines.append(box_bottom())
     lines.append("")
 
     if _IS_TTY:
