@@ -192,8 +192,36 @@ try:
 except ImportError:
     _HAS_TERMIOS = False
 
+try:
+    import msvcrt
+    _HAS_MSVCRT = True
+except ImportError:
+    _HAS_MSVCRT = False
+
 
 def _getch() -> str:
+    """Read one menu key from a Unix terminal or Windows console."""
+    if _HAS_MSVCRT:
+        ch = msvcrt.getwch()
+
+        # Windows returns a two-character sequence for arrow and function keys.
+        if ch in ("\x00", "\xe0"):
+            key = msvcrt.getwch()
+            if key == "H":
+                return "up"
+            if key == "P":
+                return "down"
+            return "special"
+
+        if ch == "\r":
+            return "enter"
+        if ch == "\x03":
+            raise KeyboardInterrupt
+        return ch
+
+    if not _HAS_TERMIOS:
+        raise RuntimeError("No interactive terminal key reader is available")
+
     fd  = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -264,7 +292,7 @@ def _fallback_select(section: str, items: list) -> int | None:
 
 
 def _select(section: str, items: list) -> int | None:
-    if _IS_TTY and _HAS_TERMIOS:
+    if _IS_TTY and (_HAS_TERMIOS or _HAS_MSVCRT):
         return _menu_select(section, items)
     return _fallback_select(section, items)
 
