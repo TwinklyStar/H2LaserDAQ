@@ -6,7 +6,8 @@ DIGITIZER_CONFIGS = {
         "snapshot_channel": "A",    # Only available in snapshot mode
         "refresh_trigger_cnt": 100, # Only available in snapshot mode
         "model": "2204A",
-        "serial": "12017/0366",
+        # "serial": "12017/0366",
+        "serial": "12017/0359",
         "channels": ["A", "B"],
         "channel_name": ["Sig", "Trig"],
         "voltage_range": {"A":"2V", "B":"2V"},      # Check readme

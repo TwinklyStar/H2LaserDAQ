@@ -29,6 +29,28 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 
 _SNAPSHOT_DIR = os.path.join("data", "snapshots")
 
+
+# ---------------------------------------------------------------------------
+# Qt5 / Qt6 compatibility
+# ---------------------------------------------------------------------------
+
+def _qt_enum(owner, name: str, scope: str):
+    """Return an enum value from either the Qt5 or Qt6 namespace layout."""
+    value = getattr(owner, name, None)
+    if value is not None:
+        return value
+    return getattr(getattr(owner, scope), name)
+
+
+_QT_RIGHT_BUTTON = _qt_enum(QtCore.Qt, "RightButton", "MouseButton")
+_QT_HORIZONTAL   = _qt_enum(QtCore.Qt, "Horizontal", "Orientation")
+_QT_NO_FOCUS     = _qt_enum(QtCore.Qt, "NoFocus", "FocusPolicy")
+_QT_ALIGN_CENTER = _qt_enum(QtCore.Qt, "AlignCenter", "AlignmentFlag")
+_QT_DASH_LINE    = _qt_enum(QtCore.Qt, "DashLine", "PenStyle")
+_QFRAME_VLINE    = _qt_enum(QtWidgets.QFrame, "VLine", "Shape")
+_QFRAME_SUNKEN   = _qt_enum(QtWidgets.QFrame, "Sunken", "Shadow")
+
+
 # ---------------------------------------------------------------------------
 # Colour scheme (Catppuccin Mocha dark palette)
 # ---------------------------------------------------------------------------
@@ -121,7 +143,7 @@ class _ZoomPanViewBox(pg.ViewBox):
         self.setMouseMode(pg.ViewBox.RectMode)
 
     def mouseDragEvent(self, ev, axis=None):
-        if ev.button() == QtCore.Qt.RightButton:
+        if ev.button() == _QT_RIGHT_BUTTON:
             ev.accept()
             # Replicate pyqtgraph's internal pan logic (same as left-click in
             # PanMode) so the right-click drag pans the view.
@@ -279,7 +301,7 @@ class _MonitorWindow(QtWidgets.QMainWindow):
         vlay.setContentsMargins(8, 8, 8, 4)
         vlay.setSpacing(4)
 
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        splitter = QtWidgets.QSplitter(_QT_HORIZONTAL)
         splitter.setHandleWidth(3)
         vlay.addWidget(splitter)
 
@@ -373,15 +395,15 @@ class _MonitorWindow(QtWidgets.QMainWindow):
 
             btn_plus  = QtWidgets.QPushButton("+")
             btn_plus.setFixedSize(44, 26)
-            btn_plus.setFocusPolicy(QtCore.Qt.NoFocus)
+            btn_plus.setFocusPolicy(_QT_NO_FOCUS)
 
             range_lbl = QtWidgets.QLabel("—")
-            range_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            range_lbl.setAlignment(_QT_ALIGN_CENTER)
             range_lbl.setStyleSheet(f"color: {col}; font-size: 10px;")
 
             btn_minus = QtWidgets.QPushButton("−")
             btn_minus.setFixedSize(44, 26)
-            btn_minus.setFocusPolicy(QtCore.Qt.NoFocus)
+            btn_minus.setFocusPolicy(_QT_NO_FOCUS)
 
             btn_plus.clicked.connect(lambda _, c=ch: self._step_range(c, +1))
             btn_minus.clicked.connect(lambda _, c=ch: self._step_range(c, -1))
@@ -437,8 +459,8 @@ class _MonitorWindow(QtWidgets.QMainWindow):
         self._ch_labels: dict = {}
         for i, ch in enumerate(self.channels):
             sep = QtWidgets.QFrame()
-            sep.setFrameShape(QtWidgets.QFrame.VLine)
-            sep.setFrameShadow(QtWidgets.QFrame.Sunken)
+            sep.setFrameShape(_QFRAME_VLINE)
+            sep.setFrameShadow(_QFRAME_SUNKEN)
             sep.setStyleSheet(f"color: {_GRID};")
             sb_lay.addWidget(sep)
 
@@ -686,15 +708,15 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
 
             btn_plus  = QtWidgets.QPushButton("+")
             btn_plus.setFixedSize(44, 26)
-            btn_plus.setFocusPolicy(QtCore.Qt.NoFocus)
+            btn_plus.setFocusPolicy(_QT_NO_FOCUS)
 
             range_lbl = QtWidgets.QLabel("—")
-            range_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            range_lbl.setAlignment(_QT_ALIGN_CENTER)
             range_lbl.setStyleSheet(f"color: {col}; font-size: 10px;")
 
             btn_minus = QtWidgets.QPushButton("−")
             btn_minus.setFixedSize(44, 26)
-            btn_minus.setFocusPolicy(QtCore.Qt.NoFocus)
+            btn_minus.setFocusPolicy(_QT_NO_FOCUS)
 
             btn_plus.clicked.connect(lambda _, c=ch: self._step_range(c, +1))
             btn_minus.clicked.connect(lambda _, c=ch: self._step_range(c, -1))
@@ -713,7 +735,7 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
             # dashed reference curve — hidden until frozen
             self._frozen_curves[ch] = p.plot(
                 pen=pg.mkPen(col, width=1.5,
-                             style=QtCore.Qt.DashLine)
+                             style=_QT_DASH_LINE)
             )
             plots[ch]              = p
             self._range_idx[ch]    = None
@@ -734,8 +756,8 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         def _sep():
             f = QtWidgets.QFrame()
             f.setObjectName("statsSep")
-            f.setFrameShape(QtWidgets.QFrame.VLine)
-            f.setFrameShadow(QtWidgets.QFrame.Sunken)
+            f.setFrameShape(_QFRAME_VLINE)
+            f.setFrameShadow(_QFRAME_SUNKEN)
             return f
 
         self._lbl_device   = QtWidgets.QLabel("  Device: —")
@@ -754,13 +776,13 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         # ── Pause / Resume toggle button ─────────────────────────────────────
         self._pause_btn = QtWidgets.QPushButton("Pause")
         self._pause_btn.setFixedSize(72, 28)
-        self._pause_btn.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._pause_btn.setFocusPolicy(_QT_NO_FOCUS)
         self._pause_btn.clicked.connect(self._on_pause)
 
         # ── Freeze / Clear toggle button ─────────────────────────────────────
         self._freeze_btn = QtWidgets.QPushButton("Freeze")
         self._freeze_btn.setFixedSize(72, 28)
-        self._freeze_btn.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._freeze_btn.setFocusPolicy(_QT_NO_FOCUS)
         self._freeze_btn.clicked.connect(self._on_freeze)
 
         # ── Math result label ────────────────────────────────────────────────
@@ -774,7 +796,7 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         # ── Save button ───────────────────────────────────────────────────────
         self._save_btn = QtWidgets.QPushButton("Save")
         self._save_btn.setFixedSize(60, 28)
-        self._save_btn.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._save_btn.setFocusPolicy(_QT_NO_FOCUS)
         self._save_btn.clicked.connect(self._on_save)
 
         lay.addWidget(self._lbl_device)
