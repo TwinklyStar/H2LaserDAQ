@@ -898,7 +898,7 @@ class _SnapshotWindow(QtWidgets.QMainWindow):
         fname = os.path.join(_SNAPSHOT_DIR, f"{prefix}{seq:03d}.csv")
 
         # ── write CSV ────────────────────────────────────────────────────────
-        with open(fname, "w") as fp:
+        with open(fname, "w", encoding="utf-8", newline="") as fp:
             fp.write("# H2LaserDAQ Snapshot\n")
             fp.write(f"# Saved   : {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}\n")
             fp.write(f"# Device  : {device}\n")
