@@ -250,6 +250,7 @@ class H2LaserDigitizer(threading.Thread):
                         self.update_queue.put(queue_dic)
                         for ch_idx in self.channels:
                             self.avg_wave_buffer[ch_idx].fill(0)
+                        self.peak_area_buffer.clear()
 
                 # -- periodic health print ------------------------------------
                 if trigger_cnt % 1000 == 0:
